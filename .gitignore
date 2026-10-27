@@ -1,0 +1,33 @@
+# Build and compiler artifacts
+*.exe
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.pdb
+*.ilk
+
+# Temporary and build directories
+tmp/
+out/
+build/
+*.tmp
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS artifacts
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Editor artifacts
+.vscode/
+.idea/
+*.swp
+*~

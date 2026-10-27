@@ -1,0 +1,12 @@
+{
+  "timestamp": "2026-10-26T12:56:15Z",
+  "os": "Windows (NT kernel x86_64)",
+  "cpu_model": "AMD Ryzen 7 5825U with Radeon Graphics",
+  "logical_cores": 16,
+  "ram_total_bytes": 16442789888,
+  "ram_total_gb": 15.31,
+  "compiler": "gcc 16.1.0",
+  "flags": "-std=c11 -Wall -Wextra -O2 -Isrc",
+  "timing_runs": 15,
+  "statistic": "median + IQR (Q3 - Q1)"
+}

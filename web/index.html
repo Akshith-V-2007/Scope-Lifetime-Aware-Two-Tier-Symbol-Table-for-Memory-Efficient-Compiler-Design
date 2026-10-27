@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Two-Tier Symbol Table Visualizer | Scope-Lifetime-Aware Architecture</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="navbar">
+        <div class="logo">
+            <span class="logo-badge">COMPILER ARCHITECTURE &bull; ILLUSTRATIVE SIMULATION</span>
+            <h1>Scope-Lifetime-Aware Two-Tier Symbol Table</h1>
+        </div>
+        <div class="nav-metrics">
+            <div class="metric-pill">
+                <span class="metric-label">Peak RAM Saved</span>
+                <span class="metric-val text-emerald" id="top-ram-saved">-84.4%</span>
+            </div>
+            <div class="metric-pill">
+                <span class="metric-label">Bloom Skip Rate</span>
+                <span class="metric-val text-cyan" id="top-bloom-rate">98.2%</span>
+            </div>
+            <div class="metric-pill">
+                <span class="metric-label">Scope Teardown</span>
+                <span class="metric-val text-amber">Arena + Hot Sweep</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard">
+        <!-- Control Bar -->
+        <section class="toolbar card">
+            <div class="toolbar-group">
+                <label for="sample-select">Benchmark Sample:</label>
+                <select id="sample-select" class="select-input">
+                    <option value="arduino">Arduino Sensor Environmental Logger</option>
+                    <option value="flight">UAV Quad-X Flight Controller Firmware</option>
+                    <option value="freertos">FreeRTOS Kernel Task Scheduler</option>
+                    <option value="shadowing">Deep Nesting & Shadowing Stress Test</option>
+                    <option value="broad">Broad Scopes (Multi-Symbol Burst)</option>
+                </select>
+            </div>
+            <div class="toolbar-group">
+                <button id="btn-step" class="btn btn-primary">Step Forward</button>
+                <button id="btn-play" class="btn btn-secondary">Auto Play</button>
+                <button id="btn-reset" class="btn btn-ghost">Reset Simulation</button>
+            </div>
+            <div class="toolbar-group">
+                <label>Hot Depth K: <span id="k-val" class="badge">2</span></label>
+                <input type="range" id="k-slider" min="1" max="8" value="2" class="slider">
+            </div>
+            <div class="toolbar-group">
+                <label class="toggle-label">
+                    <input type="checkbox" id="bloom-toggle" checked>
+                    <span>Enable Bloom Filter</span>
+                </label>
+            </div>
+        </section>
+
+        <!-- Main Workspace Grid -->
+        <div class="workspace-grid">
+            <!-- Left Panel: Code & Stepper -->
+            <section class="card code-panel">
+                <div class="panel-header">
+                    <h2>Mini-C Source Stream</h2>
+                    <span id="step-indicator" class="badge badge-info">Line 1 / Step 0</span>
+                </div>
+                <div class="code-container" id="code-display">
+                    <!-- Lines rendered via JS -->
+                </div>
+                <div class="interactive-lookup-box">
+                    <h3>Simulate Identifier Lookup</h3>
+                    <div class="lookup-input-row">
+                        <input type="text" id="lookup-query" placeholder="Enter symbol (e.g. filtered, x, temp)" value="filtered">
+                        <button id="btn-lookup" class="btn btn-accent">Trace Lookup</button>
+                    </div>
+                    <div id="lookup-trace-log" class="trace-log">
+                        <span class="text-muted">Enter a symbol and click Trace Lookup to view the multi-tier query path.</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Center Panel: Hot & Cold Tier Visualizer -->
+            <section class="card architecture-panel">
+                <div class="panel-header">
+                    <h2>Live Symbol Table Memory State</h2>
+                    <div class="legend-row">
+                        <span class="legend-item"><span class="dot hot-dot"></span> Hot Tier</span>
+                        <span class="legend-item"><span class="dot cold-dot"></span> Cold Tier (Compressed)</span>
+                        <span class="legend-item"><span class="dot cache-dot"></span> Decomp Cache</span>
+                    </div>
+                </div>
+
+                <!-- Live Memory Counters Banner -->
+                <div class="stats-banner">
+                    <div class="stat-card">
+                        <span class="stat-title">Current Table RAM</span>
+                        <span class="stat-number" id="stat-current-ram">0 B</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-title">Peak Table RAM</span>
+                        <span class="stat-number text-emerald" id="stat-peak-ram">0 B</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-title">Current Scope Depth</span>
+                        <span class="stat-number text-cyan" id="stat-scope-depth">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-title">Bloom Skips</span>
+                        <span class="stat-number text-purple" id="stat-bloom-skips">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-title">Decompressions</span>
+                        <span class="stat-number text-amber" id="stat-decomps">0</span>
+                    </div>
+                </div>
+
+                <!-- Hot Tier Visualizer -->
+                <div class="tier-section">
+                    <div class="tier-header">
+                        <h3>Hot Tier (Open-Addressing Table - Active Innermost Scopes)</h3>
+                        <span class="tier-meta" id="hot-meta">0 active symbols | Load factor 0.0%</span>
+                    </div>
+                    <div class="hot-slots-grid" id="hot-slots-container">
+                        <!-- Slots generated via JS -->
+                    </div>
+                </div>
+
+                <!-- Cold Tier Visualizer -->
+                <div class="tier-section">
+                    <div class="tier-header">
+                        <h3>Cold Tier (Delta-Encoded &amp; Bloom-Filtered Scope Blocks)</h3>
+                        <span class="tier-meta" id="cold-meta">0 compressed blocks</span>
+                    </div>
+                    <div class="cold-blocks-list" id="cold-blocks-container">
+                        <!-- Cold blocks generated via JS -->
+                        <div class="empty-placeholder">No scopes demoted to Cold Tier yet. Deepen scope stack beyond K to trigger compression.</div>
+                    </div>
+                </div>
+
+                <!-- LRU Decompression Cache Visualizer -->
+                <div class="tier-section">
+                    <div class="tier-header">
+                        <h3>LRU Decompression Cache (Scratch Buffer)</h3>
+                        <span class="tier-meta">Capacity: 2 Scopes</span>
+                    </div>
+                    <div class="cache-slots-row" id="cache-slots-container">
+                        <div class="cache-slot empty">Slot 0: [Empty]</div>
+                        <div class="cache-slot empty">Slot 1: [Empty]</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Bottom Grid: Empirical Benchmarks & Bit Layout Inspector -->
+        <div class="bottom-grid">
+            <!-- 64-bit Packed Layout Visualizer -->
+            <section class="card layout-panel">
+                <div class="panel-header">
+                    <h2>64-bit Packed Symbol Bit Layout (8 Bytes Total)</h2>
+                    <span class="badge badge-success">8 Bytes vs 64 Bytes Baseline</span>
+                </div>
+                <div class="bitfield-container">
+                    <div class="bit-chunk name-chunk" style="flex: 16;">
+                        <span class="bit-title">name_id</span>
+                        <span class="bit-width">16 bits (0..15)</span>
+                        <span class="bit-sub">Interned ID</span>
+                    </div>
+                    <div class="bit-chunk kind-chunk" style="flex: 4;">
+                        <span class="bit-title">kind</span>
+                        <span class="bit-width">4 bits</span>
+                        <span class="bit-sub">Var/Func</span>
+                    </div>
+                    <div class="bit-chunk storage-chunk" style="flex: 4;">
+                        <span class="bit-title">storage</span>
+                        <span class="bit-width">4 bits</span>
+                        <span class="bit-sub">Auto/Static</span>
+                    </div>
+                    <div class="bit-chunk depth-chunk" style="flex: 8;">
+                        <span class="bit-title">depth</span>
+                        <span class="bit-width">8 bits</span>
+                        <span class="bit-sub">0..255</span>
+                    </div>
+                    <div class="bit-chunk type-chunk" style="flex: 16;">
+                        <span class="bit-title">type_id</span>
+                        <span class="bit-width">16 bits</span>
+                        <span class="bit-sub">Type Cons</span>
+                    </div>
+                    <div class="bit-chunk offset-chunk" style="flex: 16;">
+                        <span class="bit-title">offset</span>
+                        <span class="bit-width">16 bits</span>
+                        <span class="bit-sub">Stack Frame</span>
+                    </div>
+                </div>
+                <div class="compression-formula-box">
+                    <div class="formula-col">
+                        <h4>Compression Multi-Step:</h4>
+                        <ol>
+                            <li><strong>Sorting</strong>: Sort by <code>name_id</code> enables monotonic delta encoding.</li>
+                            <li><strong>Delta Encoding</strong>: $\Delta \text{id} = \text{id}_i - \text{id}_{i-1} \Rightarrow$ small integers.</li>
+                            <li><strong>LEB128 Varint</strong>: Delivers 1–2 bytes for $\Delta$, type, and zigzag offset.</li>
+                        </ol>
+                    </div>
+                    <div class="formula-col">
+                        <h4>Bloom Filter Rejection:</h4>
+                        <p>$$P(\text{False Positive}) \approx \left(1 - e^{-k \cdot n / m}\right)^k$$</p>
+                        <p>With $m=64$ bits, $k=3$ hashes, and $n \le 8$ symbols per scope, false positive rate is <strong>&lt; 2.5%</strong>. Over 97% of cold blocks are skipped with zero decompression!</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Benchmark Charts Panel -->
+            <section class="card charts-panel">
+                <div class="panel-header">
+                    <h2>Live Benchmark Suite Comparison</h2>
+                    <div class="chart-tab-group">
+                        <button class="btn-tab active" data-chart="peak-ram">Peak RAM</button>
+                        <button class="btn-tab" data-chart="ablation">Ablation</button>
+                        <button class="btn-tab" data-chart="tradeoff">K Trade-off</button>
+                    </div>
+                </div>
+                <div class="chart-viewport" id="chart-container">
+                    <!-- Dynamic SVG chart injected here -->
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>Scope-Lifetime-Aware Two-Tier Symbol Table &bull; Advanced Compiler Design Project</p>
+        <p class="footer-links">
+            <a href="../docs/PROBLEM_STATEMENT.md" target="_blank">Problem Statement</a> &bull;
+            <a href="../report/FINAL_REPORT.md" target="_blank">Final Engineering Report</a> &bull;
+            <a href="../bench/benchmark_results.csv" target="_blank">Benchmark CSV</a>
+        </p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

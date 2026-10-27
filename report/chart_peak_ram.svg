@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 520" width="100%" height="100%" style="background:#0f172a; font-family:system-ui, -apple-system, sans-serif; border-radius:12px;">
+<text x="420.0" y="34" fill="#f8fafc" font-size="18" font-weight="bold" text-anchor="middle">Peak Symbol Table Memory: Baseline vs Two-Tier (Bytes)</text>
+<line x1="180.0" y1="60" x2="180.0" y2="460" stroke="#334155" stroke-dasharray="4" />
+<text x="180.0" y="478" fill="#94a3b8" font-size="11" text-anchor="middle">0 B</text>
+<line x1="325.23809523809524" y1="60" x2="325.23809523809524" y2="460" stroke="#334155" stroke-dasharray="4" />
+<text x="325.23809523809524" y="478" fill="#94a3b8" font-size="11" text-anchor="middle">10,000 B</text>
+<line x1="470.4761904761905" y1="60" x2="470.4761904761905" y2="460" stroke="#334155" stroke-dasharray="4" />
+<text x="470.4761904761905" y="478" fill="#94a3b8" font-size="11" text-anchor="middle">20,000 B</text>
+<line x1="615.7142857142858" y1="60" x2="615.7142857142858" y2="460" stroke="#334155" stroke-dasharray="4" />
+<text x="615.7142857142858" y="478" fill="#94a3b8" font-size="11" text-anchor="middle">30,000 B</text>
+<line x1="760.952380952381" y1="60" x2="760.952380952381" y2="460" stroke="#334155" stroke-dasharray="4" />
+<text x="760.952380952381" y="478" fill="#94a3b8" font-size="11" text-anchor="middle">40,000 B</text>
+<text x="168" y="84.0" fill="#e2e8f0" font-size="12" font-weight="500" text-anchor="end">Arduino Sensors</text>
+<rect x="180" y="68.0" width="97.58547619047619" height="16.0" fill="#f43f5e" rx="3" />
+<text x="285.5854761904762" y="82.0" fill="#fca5a5" font-size="11">6,719 B</text>
+<rect x="180" y="87.0" width="72.4447619047619" height="16.0" fill="#10b981" rx="3" />
+<text x="260.4447619047619" y="101.0" fill="#6ee7b7" font-size="11">4,988 B (-25.8%)</text>
+<text x="168" y="134.0" fill="#e2e8f0" font-size="12" font-weight="500" text-anchor="end">FreeRTOS Tasks</text>
+<rect x="180" y="118.0" width="102.97380952380952" height="16.0" fill="#f43f5e" rx="3" />
+<text x="290.9738095238095" y="132.0" fill="#fca5a5" font-size="11">7,090 B</text>
+<rect x="180" y="137.0" width="71.90738095238095" height="16.0" fill="#10b981" rx="3" />
+<text x="259.90738095238095" y="151.0" fill="#6ee7b7" font-size="11">4,951 B (-30.2%)</text>
+<text x="168" y="184.0" fill="#e2e8f0" font-size="12" font-weight="500" text-anchor="end">Zephyr Network</text>
+<rect x="180" y="168.0" width="106.11095238095237" height="16.0" fill="#f43f5e" rx="3" />
+<text x="294.11095238095237" y="182.0" fill="#fca5a5" font-size="11">7,306 B</text>
+<rect x="180" y="187.0" width="68.29095238095238" height="16.0" fill="#10b981" rx="3" />
+<text x="256.2909523809524" y="201.0" fill="#6ee7b7" font-size="11">4,702 B (-35.6%)</text>
+<text x="168" y="234.0" fill="#e2e8f0" font-size="12" font-weight="500" text-anchor="end">MiBench Telecom</text>
+<rect x="180" y="218.0" width="92.08095238095238" height="16.0" fill="#f43f5e" rx="3" />
+<text x="280.0809523809524" y="232.0" fill="#fca5a5" font-size="11">6,340 B</text>
+<rect x="180" y="237.0" width="71.9945238095238" height="16.0" fill="#10b981" rx="3" />
+<text x="259.9945238095238" y="251.0" fill="#6ee7b7" font-size="11">4,957 B (-21.8%)</text>
+<text x="168" y="284.0" fill="#e2e8f0" font-size="12" font-weight="500" text-anchor="end">Flight Controller</text>
+<rect x="180" y="268.0" width="110.75857142857143" height="16.0" fill="#f43f5e" rx="3" />
+<text x="298.75857142857143" y="282.0" fill="#fca5a5" font-size="11">7,626 B</text>
+<rect x="180" y="287.0" width="163.1604761904762" height="16.0" fill="#f59e0b" rx="3" />
+<text x="351.1604761904762" y="301.0" fill="#fcd34d" font-size="11">11,234 B (+47.3%)</text>
+<text x="168" y="334.0" fill="#e2e8f0" font-size="12" font-weight="500" text-anchor="end">Broad Scopes</text>
+<rect x="180" y="318.0" width="352.9430952380952" height="16.0" fill="#f43f5e" rx="3" />
+<text x="540.9430952380952" y="332.0" fill="#fca5a5" font-size="11">24,301 B</text>
+<rect x="180" y="337.0" width="275.9088095238095" height="16.0" fill="#10b981" rx="3" />
+<text x="463.9088095238095" y="351.0" fill="#6ee7b7" font-size="11">18,997 B (-21.8%)</text>
+<text x="168" y="384.0" fill="#e2e8f0" font-size="12" font-weight="500" text-anchor="end">Heavy Shadowing</text>
+<rect x="180" y="368.0" width="349.6607142857143" height="16.0" fill="#f43f5e" rx="3" />
+<text x="537.6607142857142" y="382.0" fill="#fca5a5" font-size="11">24,075 B</text>
+<rect x="180" y="387.0" width="139.95142857142858" height="16.0" fill="#10b981" rx="3" />
+<text x="327.95142857142855" y="401.0" fill="#6ee7b7" font-size="11">9,636 B (-60.0%)</text>
+<text x="168" y="434.0" fill="#e2e8f0" font-size="12" font-weight="500" text-anchor="end">Deep Nesting</text>
+<rect x="180" y="418.0" width="574.7216666666667" height="16.0" fill="#f43f5e" rx="3" />
+<text x="762.7216666666667" y="432.0" fill="#fca5a5" font-size="11">39,571 B</text>
+<rect x="180" y="437.0" width="236.41857142857143" height="16.0" fill="#10b981" rx="3" />
+<text x="424.41857142857145" y="451.0" fill="#6ee7b7" font-size="11">16,278 B (-58.9%)</text>
+<rect x="250" y="498" width="14" height="12" fill="#f43f5e" rx="2" />
+<text x="272" y="508" fill="#cbd5e1" font-size="11">Baseline (Malloc Stack)</text>
+<rect x="460" y="498" width="14" height="12" fill="#10b981" rx="2" />
+<text x="482" y="508" fill="#cbd5e1" font-size="11">Two-Tier Scope-Aware</text>
+</svg>
