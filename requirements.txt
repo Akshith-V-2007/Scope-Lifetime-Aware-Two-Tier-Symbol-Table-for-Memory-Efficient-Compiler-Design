@@ -1,0 +1,6 @@
+# Python Dependencies for Benchmarks, Statistical Analysis, and Figure Generation
+# Scope-Lifetime-Aware Two-Tier Symbol Table Compiler Research Suite
+
+matplotlib==3.11.2
+numpy==2.5.4
+scipy==1.18.1

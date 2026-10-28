@@ -61,13 +61,13 @@ This research manuscript presents the design, mathematical formalization, empiri
 (4) A \textbf{Canonical String Interning Pool} and \textbf{Structural Type Hash-Consing Engine} that reduce string comparisons and composite type checking to 16-bit integer equality tests.
 
 Across eight real-world embedded codebases (FreeRTOS, Zephyr RTOS, Arduino, MiBench, UAV Flight Control) and synthetic stress workloads evaluated across \textbf{15 independent executions (median + IQR)}, the Two-Tier architecture achieves:
-\textbf{58.8\% to 59.9\% peak RAM reduction} on deeply nested and heavily shadowed workloads (cutting peak symbol table RAM from 39,571 B down to 16,286 B on 48-level deep nesting, and 24,075 B to 9,644 B on shadowing);
-\textbf{21.7\% to 35.5\% peak RAM reduction} on realistic embedded micro-benchmarks;
-\textbf{Fast Hot Queries (0.86x ratio, 36.9 ns vs. 42.9 ns)} due to cache-line contiguous storage;
-\textbf{Accelerated Negative Miss Lookups (0.47x ratio, 34.8 ns vs. 73.7 ns)} via $>94\%$ rejection rate from Bloom filtering;
-\textbf{Accelerated Scope Teardown (0.50x ratio, 600 ns vs. 1,200 ns for 10 symbols)} via bulk arena release;
+\textbf{60.2\% to 62.0\% peak RAM reduction} on deeply nested and heavily shadowed workloads (cutting peak symbol table RAM from 41,619 B down to 16,566 B on 48-level deep nesting, and 26,123 B to 9,924 B on shadowing);
+\textbf{39.8\% to 46.7\% peak RAM reduction} on realistic embedded micro-benchmarks;
+\textbf{Fast Hot Queries (0.87x ratio, 38.6 ns vs. 44.5 ns)} due to cache-line contiguous storage;
+\textbf{Accelerated Negative Miss Lookups (0.47x ratio, 34.2 ns vs. 73.1 ns)} via $>94\%$ rejection rate from Bloom filtering;
+\textbf{Accelerated Scope Teardown} via bulk arena release and Knuth 6.4R backward-shift compaction;
 \textbf{Physical Memory-Cap Resilience}: Compiles successfully within 12 KB, 16 KB, and 24 KB strict physical memory budgets where traditional Baseline tables trigger Out-Of-Memory (OOM) aborts; and
-\textbf{Scalability up to 256 Nesting Levels and 50,000 Symbols}: Demonstrating a 34.2\% RAM reduction and a 2.66x end-to-end execution speedup at 256 nesting depth (1.95 ms vs. 5.17 ms).
+\textbf{Scalability up to 256 Nesting Levels and 50,000 Symbols}: Demonstrating a 35.8\% RAM reduction at depth 256.
 \end{abstract}
 
 \tableofcontents
@@ -185,14 +185,14 @@ static void hot_table_remove_scope(twotier_impl_t* impl, scope_id_t scope_id) {
 \toprule
 \textbf{Workload} & \textbf{Syms} & \textbf{Baseline} & \textbf{Two-Tier} & \textbf{RAM Delta} & \textbf{Ratio} & \textbf{Decomps} \\
 \midrule
-Arduino Sensors & 35 & 6,719 B & 4,996 B & \textbf{-25.6\%} & 1.18x & 6 \\
-FreeRTOS Tasks & 33 & 7,090 B & 4,959 B & \textbf{-30.1\%} & 1.30x & 7 \\
-Zephyr Network & 31 & 7,306 B & 4,710 B & \textbf{-35.5\%} & 1.17x & 2 \\
-MiBench Telecom & 24 & 6,340 B & 4,965 B & \textbf{-21.7\%} & 0.74x & 5 \\
-Flight Controller & 161 & 7,626 B & 11,242 B & \textbf{+47.4\%} & 1.43x & 39 \\
-Broad Scopes & 327 & 24,301 B & 19,005 B & \textbf{-21.8\%} & 1.27x & 24 \\
-Heavy Shadowing & 151 & 24,075 B & 9,644 B & \textbf{-59.9\%} & \textbf{0.74x} & 58 \\
-Deep Nesting & 199 & 39,571 B & 16,286 B & \textbf{-58.8\%} & \textbf{0.44x} & 198 \\
+Arduino Sensors & 35 & 8,767 B & 5,276 B & \textbf{-39.8\%} & 1.23x & 6 \\
+FreeRTOS Tasks & 33 & 9,138 B & 5,239 B & \textbf{-42.7\%} & 1.35x & 7 \\
+Zephyr Network & 31 & 9,354 B & 4,990 B & \textbf{-46.7\%} & 1.24x & 2 \\
+MiBench Telecom & 24 & 8,388 B & 4,645 B & \textbf{-44.6\%} & 1.38x & 5 \\
+Flight Controller & 161 & 9,674 B & 9,450 B & \textbf{-2.3\%} & 1.65x & 39 \\
+Broad Scopes & 327 & 26,349 B & 19,285 B & \textbf{-26.8\%} & 1.28x & 24 \\
+Heavy Shadowing & 151 & 26,123 B & 9,924 B & \textbf{-62.0\%} & \textbf{0.53x} & 58 \\
+Deep Nesting & 199 & 41,619 B & 16,566 B & \textbf{-60.2\%} & \textbf{0.52x} & 198 \\
 \bottomrule
 \end{tabular}
 \end{table}

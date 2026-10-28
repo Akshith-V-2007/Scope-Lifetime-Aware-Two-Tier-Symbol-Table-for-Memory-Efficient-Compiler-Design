@@ -1,0 +1,11 @@
+{
+  "hot_depth": 2,
+  "ram_budget": 0,
+  "demote_policy": "DEPTH_BOUNDED",
+  "min_scope_size": 0,
+  "bloom_enabled": true,
+  "range_enabled": true,
+  "timing_runs": 15,
+  "symtab_engine": "twotier",
+  "notes": "Default configuration for Scope-Lifetime-Aware Two-Tier Symbol Table architecture."
+}

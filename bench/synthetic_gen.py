@@ -79,7 +79,7 @@ def generate_synthetic(depth, symbols_per_scope, shadowing_rate, output_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--depth", type=int, default=32, help="Nesting depth")
-    parser.add_argument("--symbols", type=int, default=8, help="Symbols per scope")
+    parser.add_argument("--symbols", "--symbols-per-scope", dest="symbols", type=int, default=8, help="Symbols per scope")
     parser.add_argument("--shadowing", type=float, default=0.25, help="Shadowing rate [0.0 - 1.0]")
     parser.add_argument("--output", type=str, default="data/synthetic_custom.mc", help="Output file path")
     args = parser.parse_args()
