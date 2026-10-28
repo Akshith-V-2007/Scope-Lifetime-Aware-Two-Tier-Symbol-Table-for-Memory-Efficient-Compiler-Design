@@ -112,8 +112,7 @@ CD Project/
 │   └── data/results.json     # Compiled empirical benchmarks for chart display
 ├── Makefile                  # Cross-platform Makefile (Linux, macOS, Windows)
 ├── build.bat                 # Windows batch build script
-├── requirements.txt          # Pinned Python package dependencies
-└── SUBMISSION_CHECKLIST.md   # Comprehensive submission verification audit
+└── requirements.txt          # Pinned Python package dependencies
 ```
 
 ---
