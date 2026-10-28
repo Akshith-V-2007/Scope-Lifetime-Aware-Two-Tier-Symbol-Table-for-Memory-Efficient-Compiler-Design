@@ -19,6 +19,7 @@ typedef enum {
     AST_RETURN,
     AST_IF,
     AST_WHILE,
+    AST_FOR,
     AST_UNARY_EXPR,
     AST_BINARY_EXPR,
     AST_IDENT_EXPR,
@@ -94,6 +95,13 @@ struct ast_node {
             ast_node_t* cond;
             ast_node_t* body;
         } while_stmt;
+
+        struct {
+            ast_node_t* init;
+            ast_node_t* cond;
+            ast_node_t* step;
+            ast_node_t* body;
+        } for_stmt;
 
         struct {
             int op;

@@ -1,0 +1,13 @@
+workload,lines_of_code,symbols,scopes,max_depth
+arduino_sensors.mc,76,35,14,5
+freertos_tasks.mc,79,33,16,6
+zephyr_network.mc,67,31,12,6
+mibench_telecom.mc,58,24,11,5
+embedded_flight_controller.mc,416,161,67,6
+synthetic_broad_scope.mc,390,327,11,9
+synthetic_heavy_shadowing.mc,326,151,27,25
+synthetic_deep_nesting.mc,541,199,51,49
+freertos_queue.mc,203,67,44,6
+mibench_qsort.mc,173,63,35,6
+mibench_bitcount.mc,134,50,26,7
+zephyr_synopsys.mc,168,53,34,6

@@ -1,65 +1,65 @@
 workload,cap_bytes,baseline_status,baseline_peak,twotier_status,twotier_peak
-arduino_sensors.mc,4096,FAIL (OOM),4093,FAIL (OOM),4080
-arduino_sensors.mc,8192,PASS,6719,PASS,4996
-arduino_sensors.mc,12288,PASS,6719,PASS,4996
-arduino_sensors.mc,16384,PASS,6719,PASS,4996
-arduino_sensors.mc,24576,PASS,6719,PASS,4996
-arduino_sensors.mc,32768,PASS,6719,PASS,4996
-arduino_sensors.mc,49152,PASS,6719,PASS,4996
-arduino_sensors.mc,65536,PASS,6719,PASS,4996
-freertos_tasks.mc,4096,FAIL (OOM),4093,FAIL (OOM),4080
-freertos_tasks.mc,8192,PASS,7090,PASS,4959
-freertos_tasks.mc,12288,PASS,7090,PASS,4959
-freertos_tasks.mc,16384,PASS,7090,PASS,4959
-freertos_tasks.mc,24576,PASS,7090,PASS,4959
-freertos_tasks.mc,32768,PASS,7090,PASS,4959
-freertos_tasks.mc,49152,PASS,7090,PASS,4959
-freertos_tasks.mc,65536,PASS,7090,PASS,4959
-zephyr_network.mc,4096,FAIL (OOM),4084,FAIL (OOM),4080
-zephyr_network.mc,8192,PASS,7306,PASS,4710
-zephyr_network.mc,12288,PASS,7306,PASS,4710
-zephyr_network.mc,16384,PASS,7306,PASS,4710
-zephyr_network.mc,24576,PASS,7306,PASS,4710
-zephyr_network.mc,32768,PASS,7306,PASS,4710
-zephyr_network.mc,49152,PASS,7306,PASS,4710
-zephyr_network.mc,65536,PASS,7306,PASS,4710
-mibench_telecom.mc,4096,FAIL (OOM),4055,FAIL (OOM),4080
-mibench_telecom.mc,8192,PASS,6340,PASS,4965
-mibench_telecom.mc,12288,PASS,6340,PASS,4965
-mibench_telecom.mc,16384,PASS,6340,PASS,4965
-mibench_telecom.mc,24576,PASS,6340,PASS,4965
-mibench_telecom.mc,32768,PASS,6340,PASS,4965
-mibench_telecom.mc,49152,PASS,6340,PASS,4965
-mibench_telecom.mc,65536,PASS,6340,PASS,4965
-embedded_flight_controller.mc,4096,FAIL (OOM),4095,FAIL (OOM),4080
-embedded_flight_controller.mc,8192,PASS,7626,FAIL (OOM),8117
-embedded_flight_controller.mc,12288,PASS,7626,PASS,11242
-embedded_flight_controller.mc,16384,PASS,7626,PASS,11242
-embedded_flight_controller.mc,24576,PASS,7626,PASS,11242
-embedded_flight_controller.mc,32768,PASS,7626,PASS,11242
-embedded_flight_controller.mc,49152,PASS,7626,PASS,11242
-embedded_flight_controller.mc,65536,PASS,7626,PASS,11242
-synthetic_broad_scope.mc,4096,FAIL (OOM),3739,FAIL (OOM),4080
-synthetic_broad_scope.mc,8192,FAIL (OOM),8192,FAIL (OOM),8161
-synthetic_broad_scope.mc,12288,FAIL (OOM),12273,FAIL (OOM),12060
-synthetic_broad_scope.mc,16384,FAIL (OOM),16375,FAIL (OOM),16348
-synthetic_broad_scope.mc,24576,PASS,24301,PASS,19005
-synthetic_broad_scope.mc,32768,PASS,24301,PASS,19005
-synthetic_broad_scope.mc,49152,PASS,24301,PASS,19005
-synthetic_broad_scope.mc,65536,PASS,24301,PASS,19005
-synthetic_heavy_shadowing.mc,4096,FAIL (OOM),3739,FAIL (OOM),4088
-synthetic_heavy_shadowing.mc,8192,FAIL (OOM),7969,FAIL (OOM),8124
-synthetic_heavy_shadowing.mc,12288,FAIL (OOM),12211,PASS,9644
-synthetic_heavy_shadowing.mc,16384,FAIL (OOM),16375,PASS,9644
-synthetic_heavy_shadowing.mc,24576,PASS,24075,PASS,9644
-synthetic_heavy_shadowing.mc,32768,PASS,24075,PASS,9644
-synthetic_heavy_shadowing.mc,49152,PASS,24075,PASS,9644
-synthetic_heavy_shadowing.mc,65536,PASS,24075,PASS,9644
-synthetic_deep_nesting.mc,4096,FAIL (OOM),3739,FAIL (OOM),4080
-synthetic_deep_nesting.mc,8192,FAIL (OOM),8171,FAIL (OOM),7932
-synthetic_deep_nesting.mc,12288,FAIL (OOM),11931,FAIL (OOM),11548
-synthetic_deep_nesting.mc,16384,FAIL (OOM),16375,PASS,16286
-synthetic_deep_nesting.mc,24576,FAIL (OOM),24561,PASS,16286
-synthetic_deep_nesting.mc,32768,FAIL (OOM),32737,PASS,16286
-synthetic_deep_nesting.mc,49152,PASS,39571,PASS,16286
-synthetic_deep_nesting.mc,65536,PASS,39571,PASS,16286
+arduino_sensors.mc,4096,FAIL (OOM),96,FAIL (OOM),4082
+arduino_sensors.mc,8192,FAIL (OOM),8170,PASS,5276
+arduino_sensors.mc,12288,PASS,8767,PASS,5276
+arduino_sensors.mc,16384,PASS,8767,PASS,5276
+arduino_sensors.mc,24576,PASS,8767,PASS,5276
+arduino_sensors.mc,32768,PASS,8767,PASS,5276
+arduino_sensors.mc,49152,PASS,8767,PASS,5276
+arduino_sensors.mc,65536,PASS,8767,PASS,5276
+freertos_tasks.mc,4096,FAIL (OOM),96,FAIL (OOM),4096
+freertos_tasks.mc,8192,FAIL (OOM),8040,PASS,5239
+freertos_tasks.mc,12288,PASS,9138,PASS,5239
+freertos_tasks.mc,16384,PASS,9138,PASS,5239
+freertos_tasks.mc,24576,PASS,9138,PASS,5239
+freertos_tasks.mc,32768,PASS,9138,PASS,5239
+freertos_tasks.mc,49152,PASS,9138,PASS,5239
+freertos_tasks.mc,65536,PASS,9138,PASS,5239
+zephyr_network.mc,4096,FAIL (OOM),96,FAIL (OOM),4089
+zephyr_network.mc,8192,FAIL (OOM),8043,PASS,4990
+zephyr_network.mc,12288,PASS,9354,PASS,4990
+zephyr_network.mc,16384,PASS,9354,PASS,4990
+zephyr_network.mc,24576,PASS,9354,PASS,4990
+zephyr_network.mc,32768,PASS,9354,PASS,4990
+zephyr_network.mc,49152,PASS,9354,PASS,4990
+zephyr_network.mc,65536,PASS,9354,PASS,4990
+mibench_telecom.mc,4096,FAIL (OOM),96,FAIL (OOM),4080
+mibench_telecom.mc,8192,PASS,7884,PASS,4645
+mibench_telecom.mc,12288,PASS,8388,PASS,4645
+mibench_telecom.mc,16384,PASS,8388,PASS,4645
+mibench_telecom.mc,24576,PASS,8388,PASS,4645
+mibench_telecom.mc,32768,PASS,8388,PASS,4645
+mibench_telecom.mc,49152,PASS,8388,PASS,4645
+mibench_telecom.mc,65536,PASS,8388,PASS,4645
+embedded_flight_controller.mc,4096,FAIL (OOM),96,FAIL (OOM),4085
+embedded_flight_controller.mc,8192,FAIL (OOM),8188,FAIL (OOM),8176
+embedded_flight_controller.mc,12288,PASS,9674,PASS,9450
+embedded_flight_controller.mc,16384,PASS,9674,PASS,9450
+embedded_flight_controller.mc,24576,PASS,9674,PASS,9450
+embedded_flight_controller.mc,32768,PASS,9674,PASS,9450
+embedded_flight_controller.mc,49152,PASS,9674,PASS,9450
+embedded_flight_controller.mc,65536,PASS,9674,PASS,9450
+synthetic_broad_scope.mc,4096,FAIL (OOM),96,FAIL (OOM),4087
+synthetic_broad_scope.mc,8192,FAIL (OOM),8176,FAIL (OOM),8185
+synthetic_broad_scope.mc,12288,FAIL (OOM),12285,FAIL (OOM),12188
+synthetic_broad_scope.mc,16384,FAIL (OOM),16085,FAIL (OOM),16308
+synthetic_broad_scope.mc,24576,FAIL (OOM),24569,PASS,19285
+synthetic_broad_scope.mc,32768,PASS,26349,PASS,19285
+synthetic_broad_scope.mc,49152,PASS,26349,PASS,19285
+synthetic_broad_scope.mc,65536,PASS,26349,PASS,19285
+synthetic_heavy_shadowing.mc,4096,FAIL (OOM),96,FAIL (OOM),4057
+synthetic_heavy_shadowing.mc,8192,FAIL (OOM),8191,FAIL (OOM),8176
+synthetic_heavy_shadowing.mc,12288,FAIL (OOM),12277,PASS,9924
+synthetic_heavy_shadowing.mc,16384,FAIL (OOM),15960,PASS,9924
+synthetic_heavy_shadowing.mc,24576,FAIL (OOM),24456,PASS,9924
+synthetic_heavy_shadowing.mc,32768,PASS,26123,PASS,9924
+synthetic_heavy_shadowing.mc,49152,PASS,26123,PASS,9924
+synthetic_heavy_shadowing.mc,65536,PASS,26123,PASS,9924
+synthetic_deep_nesting.mc,4096,FAIL (OOM),96,FAIL (OOM),4057
+synthetic_deep_nesting.mc,8192,FAIL (OOM),8019,FAIL (OOM),8180
+synthetic_deep_nesting.mc,12288,FAIL (OOM),12283,FAIL (OOM),11988
+synthetic_deep_nesting.mc,16384,FAIL (OOM),16223,PASS,16030
+synthetic_deep_nesting.mc,24576,FAIL (OOM),24448,PASS,16566
+synthetic_deep_nesting.mc,32768,FAIL (OOM),32675,PASS,16566
+synthetic_deep_nesting.mc,49152,PASS,41619,PASS,16566
+synthetic_deep_nesting.mc,65536,PASS,41619,PASS,16566

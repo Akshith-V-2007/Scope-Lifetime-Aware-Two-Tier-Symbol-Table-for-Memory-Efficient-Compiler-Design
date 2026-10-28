@@ -6,6 +6,7 @@
 #include "common/type_table.h"
 #include "symtab/symtab_api.h"
 #include "symtab/symtab_baseline.h"
+#include "symtab/symtab_strong_baseline.h"
 #include "symtab/symtab_twotier.h"
 #include "symtab/symtab_ablation.h"
 #include "compiler/parser.h"
@@ -14,7 +15,7 @@
 static void print_usage(const char* prog) {
     printf("Usage: %s [options] <input_file.mc>\n", prog);
     printf("Options:\n");
-    printf("  --symtab <baseline|twotier|arena|intern|packed|nombloom>  Select symbol table engine (default: twotier)\n");
+    printf("  --symtab <baseline|strong_baseline|twotier|arena|intern|packed|nombloom>  Select symbol table engine (default: twotier)\n");
     printf("  --hot-depth <N>                                          Set hot scope depth K (default: 2)\n");
     printf("  --min-scope-size <N>                                     Minimum symbols in scope before demoting (default: 0)\n");
     printf("  --ram-budget <bytes>                                     Enable budget mode with RAM cap\n");
@@ -160,6 +161,8 @@ int main(int argc, char** argv) {
     symtab_t* tab = NULL;
     if (strcmp(symtab_type, "baseline") == 0) {
         tab = symtab_baseline_create();
+    } else if (strcmp(symtab_type, "strong_baseline") == 0) {
+        tab = symtab_strong_baseline_create();
     } else if (strcmp(symtab_type, "arena") == 0) {
         tab = symtab_ablation_create(SYMTAB_ARENA_ONLY);
     } else if (strcmp(symtab_type, "intern") == 0) {
@@ -180,6 +183,12 @@ int main(int argc, char** argv) {
     bool success = semantic_analyze(&sem_ctx, program);
 
     if (dump_stats) {
+        size_t loc = 0;
+        for (const char* p = source; *p; p++) {
+            if (*p == '\n') loc++;
+        }
+        if (source[0] != '\0' && source[strlen(source)-1] != '\n') loc++;
+
         symtab_stats_t stats;
         tab->get_stats(tab, &stats);
         printf("\n[%s] Status: %s | Peak RAM: %zu bytes | Inserts: %llu | Lookups: %llu | Hot Hits: %llu | Cold Hits: %llu | Skips: %llu | Decomps: %llu\n",
@@ -190,6 +199,8 @@ int main(int argc, char** argv) {
                (unsigned long long)stats.cold_hits,
                (unsigned long long)stats.bloom_skips,
                (unsigned long long)stats.decompressions);
+        printf("[WORKLOAD-METRICS] file=%s loc=%zu symbols=%zu scopes=%zu max_depth=%d\n",
+               filename, loc, sem_ctx.total_symbols, sem_ctx.total_scopes, sem_ctx.max_scope_depth);
     }
 
     tab->destroy(tab);

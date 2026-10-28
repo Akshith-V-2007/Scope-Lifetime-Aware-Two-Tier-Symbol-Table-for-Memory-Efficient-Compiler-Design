@@ -4,7 +4,7 @@ echo  Building Scope-Lifetime-Aware Two-Tier Symbol Table and Compiler
 echo ====================================================================
 
 echo [1/5] Compiling minicc compiler executable...
-gcc -O2 -std=c11 -Wall -Wextra -Isrc src/main.c src/common/mem_tracker.c src/common/string_pool.c src/common/type_table.c src/common/arena.c src/common/varint.c src/common/scope_block.c src/symtab/symtab_baseline.c src/symtab/symtab_twotier.c src/symtab/symtab_ablation.c src/compiler/lexer.c src/compiler/ast.c src/compiler/parser.c src/compiler/semantic.c -o minicc.exe
+gcc -O2 -std=c11 -Wall -Wextra -Isrc src/main.c src/common/mem_tracker.c src/common/string_pool.c src/common/type_table.c src/common/arena.c src/common/varint.c src/common/scope_block.c src/symtab/symtab_baseline.c src/symtab/symtab_strong_baseline.c src/symtab/symtab_twotier.c src/symtab/symtab_ablation.c src/compiler/lexer.c src/compiler/ast.c src/compiler/parser.c src/compiler/semantic.c -o minicc.exe -lpsapi
 if %ERRORLEVEL% NEQ 0 ( echo Failed to build minicc.exe & exit /b %ERRORLEVEL% )
 
 echo [2/5] Compiling baseline unit tests...
@@ -18,7 +18,7 @@ gcc -std=c11 -Wall -Wextra -Isrc tests/test_differential.c src/common/mem_tracke
 gcc -std=c11 -Wall -Wextra -Isrc tests/test_edge_cases.c src/common/mem_tracker.c src/common/string_pool.c src/common/type_table.c src/common/arena.c src/common/varint.c src/common/scope_block.c src/symtab/symtab_baseline.c src/symtab/symtab_twotier.c -o test_edge_cases.exe
 
 echo [5/5] Compiling high-precision benchmark runner...
-gcc -O2 -std=c11 -Wall -Wextra -Isrc bench/bench_runner.c src/common/mem_tracker.c src/common/string_pool.c src/common/type_table.c src/common/arena.c src/common/varint.c src/common/scope_block.c src/symtab/symtab_baseline.c src/symtab/symtab_twotier.c src/symtab/symtab_ablation.c src/compiler/lexer.c src/compiler/ast.c src/compiler/parser.c src/compiler/semantic.c -o bench_runner.exe
+gcc -O2 -std=c11 -Wall -Wextra -Isrc bench/bench_runner.c src/common/mem_tracker.c src/common/string_pool.c src/common/type_table.c src/common/arena.c src/common/varint.c src/common/scope_block.c src/symtab/symtab_baseline.c src/symtab/symtab_strong_baseline.c src/symtab/symtab_twotier.c src/symtab/symtab_ablation.c src/compiler/lexer.c src/compiler/ast.c src/compiler/parser.c src/compiler/semantic.c -o bench_runner.exe -lpsapi
 
 echo ====================================================================
 echo  BUILD COMPLETE! All binaries compiled successfully.

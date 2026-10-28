@@ -12,6 +12,7 @@ COMMON_SRCS = src/common/mem_tracker.c \
               src/common/scope_block.c
 
 SYMTAB_SRCS = src/symtab/symtab_baseline.c \
+              src/symtab/symtab_strong_baseline.c \
               src/symtab/symtab_twotier.c \
               src/symtab/symtab_ablation.c
 
@@ -27,10 +28,12 @@ ifeq ($(OS),Windows_NT)
     EXE = .exe
     RM = del /Q /F 2>nul || rm -f
     MKDIR = mkdir 2>nul || true
+    LDLIBS = -lpsapi
 else
     EXE =
     RM = rm -f
     MKDIR = mkdir -p
+    LDLIBS =
 endif
 
 TARGETS = minicc$(EXE) \
@@ -45,7 +48,7 @@ TARGETS = minicc$(EXE) \
 all: $(TARGETS)
 
 minicc$(EXE): src/main.c $(ALL_SRCS)
-	$(CC) $(CFLAGS) src/main.c $(ALL_SRCS) -o $@
+	$(CC) $(CFLAGS) src/main.c $(ALL_SRCS) $(LDLIBS) -o $@
 
 test_baseline$(EXE): tests/test_baseline.c src/common/mem_tracker.c src/symtab/symtab_baseline.c
 	$(CC) $(CFLAGS) tests/test_baseline.c src/common/mem_tracker.c src/symtab/symtab_baseline.c -o $@
@@ -60,7 +63,7 @@ test_edge_cases$(EXE): tests/test_edge_cases.c $(COMMON_SRCS) src/symtab/symtab_
 	$(CC) $(CFLAGS) tests/test_edge_cases.c $(COMMON_SRCS) src/symtab/symtab_baseline.c src/symtab/symtab_twotier.c -o $@
 
 bench_runner$(EXE): bench/bench_runner.c $(ALL_SRCS)
-	$(CC) $(CFLAGS) bench/bench_runner.c $(ALL_SRCS) -o $@
+	$(CC) $(CFLAGS) bench/bench_runner.c $(ALL_SRCS) $(LDLIBS) -o $@
 
 test: test_baseline$(EXE) test_roundtrip$(EXE) test_differential$(EXE) test_edge_cases$(EXE)
 	@echo "--- Running Baseline Unit Tests ---"

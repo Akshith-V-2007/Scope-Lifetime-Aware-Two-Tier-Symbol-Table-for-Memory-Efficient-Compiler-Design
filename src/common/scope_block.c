@@ -106,7 +106,7 @@ bool scope_block_compress(compressed_scope_block_t* block, const packed_symbol_t
 }
 
 size_t scope_block_decompress(const compressed_scope_block_t* block, packed_symbol_t* out_symbols, size_t max_count) {
-    if (!block || !block->compressed_data || block->symbol_count == 0) {
+    if (!block || !block->compressed_data || !out_symbols || block->symbol_count == 0 || max_count == 0) {
         return 0;
     }
 

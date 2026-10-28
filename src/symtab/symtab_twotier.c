@@ -64,6 +64,7 @@ typedef struct {
 
     /* Flags & Stats */
     bool bloom_enabled;
+    bool range_enabled;
     twotier_demote_policy_t demote_policy;
     int min_scope_size;
     symtab_stats_t stats;
@@ -516,9 +517,11 @@ static const symbol_record_t* twotier_lookup(symtab_t* self, const char* name) {
         compressed_scope_block_t* blk = s->cold_block;
 
         /* Range check */
-        if (nid < blk->min_name_id || nid > blk->max_name_id) {
-            impl->stats.range_skips++;
-            continue;
+        if (impl->range_enabled) {
+            if (nid < blk->min_name_id || nid > blk->max_name_id) {
+                impl->stats.range_skips++;
+                continue;
+            }
         }
 
         /* Bloom Filter check */
@@ -556,11 +559,22 @@ static const symbol_record_t* twotier_lookup(symtab_t* self, const char* name) {
 
             if (cache_slot->capacity < blk->symbol_count) {
                 size_t new_cap = blk->symbol_count + 32;
-                cache_slot->symbols = (packed_symbol_t*)tracked_realloc(
+                packed_symbol_t* new_syms = (packed_symbol_t*)tracked_realloc(
                     cache_slot->symbols, 
                     sizeof(packed_symbol_t) * new_cap
                 );
+                if (!new_syms) {
+                    /* Out of memory / budget limit hit */
+                    impl->stats.misses++;
+                    return NULL;
+                }
+                cache_slot->symbols = new_syms;
                 cache_slot->capacity = new_cap;
+            }
+
+            if (!cache_slot->symbols) {
+                impl->stats.misses++;
+                return NULL;
             }
 
             cache_slot->count = scope_block_decompress(blk, cache_slot->symbols, cache_slot->capacity);
@@ -605,6 +619,8 @@ static void twotier_set_param(symtab_t* self, const char* key, int value) {
         impl->hot_depth = value;
     } else if (strcmp(key, "bloom") == 0) {
         impl->bloom_enabled = (value != 0);
+    } else if (strcmp(key, "range") == 0 || strcmp(key, "range_filter") == 0) {
+        impl->range_enabled = (value != 0);
     } else if (strcmp(key, "ram_budget") == 0) {
         impl->ram_budget = (size_t)value;
     } else if (strcmp(key, "demote_policy") == 0) {
@@ -678,6 +694,7 @@ symtab_t* symtab_twotier_create_with_policy(int hot_depth, size_t ram_budget, tw
     impl->demote_policy = policy;
     impl->scope_depth = -1;
     impl->bloom_enabled = true;
+    impl->range_enabled = true;
 
     impl->pool = string_pool_create(32);
     impl->type_table = type_table_create();

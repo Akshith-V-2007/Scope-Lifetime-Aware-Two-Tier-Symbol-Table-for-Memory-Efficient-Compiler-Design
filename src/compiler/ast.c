@@ -77,6 +77,12 @@ void ast_destroy_node(ast_node_t* node) {
             ast_destroy_node(node->as.while_stmt.cond);
             ast_destroy_node(node->as.while_stmt.body);
             break;
+        case AST_FOR:
+            if (node->as.for_stmt.init) ast_destroy_node(node->as.for_stmt.init);
+            if (node->as.for_stmt.cond) ast_destroy_node(node->as.for_stmt.cond);
+            if (node->as.for_stmt.step) ast_destroy_node(node->as.for_stmt.step);
+            if (node->as.for_stmt.body) ast_destroy_node(node->as.for_stmt.body);
+            break;
         case AST_UNARY_EXPR:
             ast_destroy_node(node->as.unary.operand);
             break;

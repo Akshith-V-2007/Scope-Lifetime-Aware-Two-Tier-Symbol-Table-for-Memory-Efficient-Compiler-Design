@@ -1,50 +1,59 @@
 experiment,workload,engine,peak_ram_bytes,inserts,lookups,hot_hits,cold_hits,bloom_skips,decomps,bytes_per_sym,median_time_ns,slowdown_ratio
-exp1,arduino_sensors.mc,baseline,6719,35,38,12,26,0,0,319.95,8800.0,1.00
-exp1,arduino_sensors.mc,twotier,4996,35,38,23,15,0,6,237.90,10400.0,1.18
-exp1,freertos_tasks.mc,baseline,7090,33,33,13,20,0,0,417.06,7900.0,1.00
-exp1,freertos_tasks.mc,twotier,4959,33,33,22,11,0,7,291.71,10300.0,1.30
-exp1,zephyr_network.mc,baseline,7306,31,28,10,18,0,0,332.09,7500.0,1.00
-exp1,zephyr_network.mc,twotier,4710,31,28,20,8,0,2,214.09,8800.0,1.17
-exp1,mibench_telecom.mc,baseline,6340,24,30,8,22,0,0,422.67,10600.0,1.00
-exp1,mibench_telecom.mc,twotier,4965,24,30,18,12,0,5,331.00,7800.0,0.74
-exp1,embedded_flight_controller.mc,baseline,7626,161,303,73,230,0,0,211.83,45300.0,1.00
-exp1,embedded_flight_controller.mc,twotier,11242,161,303,173,130,1,39,312.28,64900.0,1.43
-exp1,synthetic_broad_scope.mc,baseline,24301,327,124,16,108,0,0,74.77,46300.0,1.00
-exp1,synthetic_broad_scope.mc,twotier,19005,327,124,36,88,4,24,58.48,58600.0,1.27
-exp1,synthetic_heavy_shadowing.mc,baseline,24075,151,364,38,326,0,0,161.58,64400.0,1.00
-exp1,synthetic_heavy_shadowing.mc,twotier,9644,151,364,69,295,139,58,64.72,47700.0,0.74
-exp1,synthetic_deep_nesting.mc,baseline,39571,199,721,28,693,0,0,200.87,216500.0,1.00
-exp1,synthetic_deep_nesting.mc,twotier,16286,199,721,44,677,379,198,82.67,95200.0,0.44
-exp2_ablation,1. Baseline (Malloc-Chained),39571,0.0,200.9
-exp2_ablation,2. + Arena Allocator,33912,14.3,172.1
-exp2_ablation,3. + String Interning,27096,31.5,137.5
-exp2_ablation,4. + 64-bit Packed Symbols,20696,47.7,105.1
-exp2_ablation,5. + Delta/Varint Compression,16286,58.8,82.7
-exp2_ablation,6. + Bloom Filter (Full Two-Tier),16286,58.8,82.7
-exp4_policy,embedded_flight_controller.mc,eager_depth_bounded,11242,161,303,173,130,1,39,0.0,0.0,0.0
-exp4_policy,embedded_flight_controller.mc,lazy_on_exit,10624,161,303,303,0,0,0,0.0,0.0,0.0
-exp4_policy,embedded_flight_controller.mc,size_aware_threshold,10602,161,303,294,9,0,1,0.0,0.0,0.0
-exp4_policy,synthetic_deep_nesting.mc,eager_depth_bounded,16286,199,721,44,677,379,198,0.0,0.0,0.0
-exp4_policy,synthetic_deep_nesting.mc,lazy_on_exit,34920,199,721,721,0,0,0,0.0,0.0,0.0
-exp4_policy,synthetic_deep_nesting.mc,size_aware_threshold,34920,199,721,721,0,0,0,0.0,0.0,0.0
-exp5_latency,insert,500,0,0,0,0,0,0,0,0.0,218.80,2.08
-exp5_latency,hot_lookup,2000,0,0,0,0,0,0,0,0.0,38.20,0.87
-exp5_latency,cold_lookup_warm,2000,0,0,0,0,0,0,0,0.0,36.30,0.40
-exp5_latency,cold_lookup_forced,600,0,0,0,0,0,0,0,0.0,220.50,4.94
-exp5_latency,miss_lookup,2000,0,0,0,0,0,0,0,0.0,34.95,0.47
-exp5_latency,scope_teardown,100,0,0,0,0,0,0,0,0.0,10200.00,1.00
-exp3_sweep_k,1,twotier,16023,199,721,28,693,410,209,81.34,0.0,0.0
-exp3_sweep_k,2,twotier,16286,199,721,44,677,379,198,82.67,0.0,0.0
-exp3_sweep_k,4,twotier,16812,199,721,101,620,324,167,85.34,0.0,0.0
-exp3_sweep_k,8,twotier,18249,199,721,187,534,233,120,92.63,0.0,0.0
-exp3_sweep_k,16,twotier,21124,199,721,317,404,115,73,107.23,0.0,0.0
-exp3_sweep_k,32,twotier,26884,199,721,534,187,9,14,136.47,0.0,0.0
-exp3_sweep_k,64,twotier,34920,199,721,721,0,0,0,177.26,0.0,0.0
-exp6_budget_cap,4096,FAIL (OOM Exceeded),4088,12,364,0,0,0,0,0.0,0.0,0.0
-exp6_budget_cap,8192,FAIL (OOM Exceeded),8124,116,364,0,0,0,0,0.0,0.0,0.0
-exp6_budget_cap,12288,PASS (Enforced <= Cap),9644,151,364,0,0,0,0,0.0,0.0,0.0
-exp6_budget_cap,16384,PASS (Enforced <= Cap),9644,151,364,0,0,0,0,0.0,0.0,0.0
-exp6_budget_cap,24576,PASS (Enforced <= Cap),9644,151,364,0,0,0,0,0.0,0.0,0.0
-exp6_budget_cap,32768,PASS (Enforced <= Cap),9644,151,364,0,0,0,0,0.0,0.0,0.0
-exp6_budget_cap,49152,PASS (Enforced <= Cap),9644,151,364,0,0,0,0,0.0,0.0,0.0
-exp6_budget_cap,65536,PASS (Enforced <= Cap),9644,151,364,0,0,0,0,0.0,0.0,0.0
+exp1,arduino_sensors.mc,baseline,8767,35,38,12,26,0,0,417.48,8800.0,1.00
+exp1,arduino_sensors.mc,strong_baseline,5208,35,38,38,0,0,0,248.00,5300.0,0.60
+exp1,arduino_sensors.mc,twotier,5276,35,38,23,15,0,6,251.24,10800.0,1.23
+exp1,freertos_tasks.mc,baseline,9138,33,33,13,20,0,0,537.53,9800.0,1.00
+exp1,freertos_tasks.mc,strong_baseline,5472,33,33,33,0,0,0,321.88,6300.0,0.64
+exp1,freertos_tasks.mc,twotier,5239,33,33,22,11,0,7,308.18,13200.0,1.35
+exp1,zephyr_network.mc,baseline,9354,31,28,10,18,0,0,425.18,7600.0,1.00
+exp1,zephyr_network.mc,strong_baseline,5536,31,28,28,0,0,0,251.64,4200.0,0.55
+exp1,zephyr_network.mc,twotier,4990,31,28,20,8,0,2,226.82,9400.0,1.24
+exp1,mibench_telecom.mc,baseline,8388,24,30,8,22,0,0,559.20,6100.0,1.00
+exp1,mibench_telecom.mc,strong_baseline,4608,24,30,30,0,0,0,307.20,4000.0,0.66
+exp1,mibench_telecom.mc,twotier,4645,24,30,18,12,0,5,309.67,8400.0,1.38
+exp1,embedded_flight_controller.mc,baseline,9674,161,303,73,230,0,0,268.72,44800.0,1.00
+exp1,embedded_flight_controller.mc,strong_baseline,8272,161,303,303,0,0,0,229.78,36400.0,0.81
+exp1,embedded_flight_controller.mc,twotier,9450,161,303,173,130,1,39,262.50,73800.0,1.65
+exp1,synthetic_broad_scope.mc,baseline,26349,327,124,16,108,0,0,81.07,46200.0,1.00
+exp1,synthetic_broad_scope.mc,strong_baseline,21792,327,124,124,0,0,0,67.05,31200.0,0.68
+exp1,synthetic_broad_scope.mc,twotier,19285,327,124,36,88,4,24,59.34,59000.0,1.28
+exp1,synthetic_heavy_shadowing.mc,baseline,26123,151,364,38,326,0,0,175.32,88300.0,1.00
+exp1,synthetic_heavy_shadowing.mc,strong_baseline,16720,151,364,364,0,0,0,112.21,33200.0,0.38
+exp1,synthetic_heavy_shadowing.mc,twotier,9924,151,364,69,295,139,58,66.60,46500.0,0.53
+exp1,synthetic_deep_nesting.mc,baseline,41619,199,721,28,693,0,0,211.26,193500.0,1.00
+exp1,synthetic_deep_nesting.mc,strong_baseline,33544,199,721,721,0,0,0,170.27,72500.0,0.37
+exp1,synthetic_deep_nesting.mc,twotier,16566,199,721,44,677,379,198,84.09,99800.0,0.52
+exp2_ablation,1. Baseline (Malloc-Chained),41619,0.0,211.3
+exp2_ablation,2. Strong Baseline (Open-Addr, No Comp),33544,19.4,170.3
+exp2_ablation,3. + Arena Allocator,33912,18.5,172.1
+exp2_ablation,4. + String Interning,27376,34.2,139.0
+exp2_ablation,5. + 64-bit Packed Symbols,20976,49.6,106.5
+exp2_ablation,6. + Delta/Varint Compression,16566,60.2,84.1
+exp2_ablation,7. + Bloom Filter (Full Two-Tier),16566,60.2,84.1
+exp4_policy,embedded_flight_controller.mc,eager_depth_bounded,9450,161,303,173,130,1,39,0.0,0.0,0.0
+exp4_policy,embedded_flight_controller.mc,lazy_on_exit,8872,161,303,303,0,0,0,0.0,0.0,0.0
+exp4_policy,embedded_flight_controller.mc,size_aware_threshold,8810,161,303,294,9,0,1,0.0,0.0,0.0
+exp4_policy,synthetic_deep_nesting.mc,eager_depth_bounded,16566,199,721,44,677,379,198,0.0,0.0,0.0
+exp4_policy,synthetic_deep_nesting.mc,lazy_on_exit,35200,199,721,721,0,0,0,0.0,0.0,0.0
+exp4_policy,synthetic_deep_nesting.mc,size_aware_threshold,35200,199,721,721,0,0,0,0.0,0.0,0.0
+exp5_latency,insert,500,0,0,0,0,0,0,0,0.0,338.40,1.79
+exp5_latency,hot_lookup,2000,0,0,0,0,0,0,0,0.0,39.60,0.94
+exp5_latency,outer_scope_lookup,2000,0,0,0,0,0,0,0,0.0,36.05,0.41
+exp5_latency,cold_lookup_forced,600,0,0,0,0,0,0,0,0.0,231.33,5.07
+exp5_latency,miss_lookup,2000,0,0,0,0,0,0,0,0.0,36.40,0.49
+exp5_latency,scope_teardown,100,0,0,0,0,0,0,0,0.0,9700.00,1.02
+exp3_sweep_k,1,twotier,16303,199,721,28,693,410,209,82.76,0.0,0.0
+exp3_sweep_k,2,twotier,16566,199,721,44,677,379,198,84.09,0.0,0.0
+exp3_sweep_k,4,twotier,17092,199,721,101,620,324,167,86.76,0.0,0.0
+exp3_sweep_k,8,twotier,18529,199,721,187,534,233,120,94.06,0.0,0.0
+exp3_sweep_k,16,twotier,21404,199,721,317,404,115,73,108.65,0.0,0.0
+exp3_sweep_k,32,twotier,27164,199,721,534,187,9,14,137.89,0.0,0.0
+exp3_sweep_k,64,twotier,35200,199,721,721,0,0,0,178.68,0.0,0.0
+exp6_budget_cap,4096,FAIL (OOM Exceeded),4057,24,364,0,0,0,0,0.0,0.0,0.0
+exp6_budget_cap,8192,FAIL (OOM Exceeded),8176,139,364,0,0,0,0,0.0,0.0,0.0
+exp6_budget_cap,12288,PASS (Enforced <= Cap),9924,151,364,0,0,0,0,0.0,0.0,0.0
+exp6_budget_cap,16384,PASS (Enforced <= Cap),9924,151,364,0,0,0,0,0.0,0.0,0.0
+exp6_budget_cap,24576,PASS (Enforced <= Cap),9924,151,364,0,0,0,0,0.0,0.0,0.0
+exp6_budget_cap,32768,PASS (Enforced <= Cap),9924,151,364,0,0,0,0,0.0,0.0,0.0
+exp6_budget_cap,49152,PASS (Enforced <= Cap),9924,151,364,0,0,0,0,0.0,0.0,0.0
+exp6_budget_cap,65536,PASS (Enforced <= Cap),9924,151,364,0,0,0,0,0.0,0.0,0.0

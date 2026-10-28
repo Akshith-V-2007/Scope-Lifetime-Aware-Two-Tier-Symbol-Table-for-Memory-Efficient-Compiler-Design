@@ -127,7 +127,9 @@ static void analyze_statement(semantic_context_t* ctx, ast_node_t* stmt) {
             ctx->current_offset += ti ? (int)ti->size_bytes : 4;
 
             bool ok = ctx->symtab->insert(ctx->symtab, name, tid, KIND_VAR, offset);
-            if (!ok) {
+            if (ok) {
+                ctx->total_symbols++;
+            } else {
                 char err[128];
                 snprintf(err, sizeof(err), "Redeclaration of symbol '%s' in the same scope", name);
                 report_error(ctx, stmt->line, stmt->col, err);
@@ -141,6 +143,10 @@ static void analyze_statement(semantic_context_t* ctx, ast_node_t* stmt) {
 
         case AST_BLOCK: {
             ctx->symtab->enter_scope(ctx->symtab);
+            ctx->total_scopes++;
+            int cur_depth = ctx->symtab->get_scope_depth(ctx->symtab);
+            if (cur_depth > ctx->max_scope_depth) ctx->max_scope_depth = cur_depth;
+
             for (size_t i = 0; i < stmt->as.block.count; i++) {
                 analyze_statement(ctx, stmt->as.block.statements[i]);
             }
@@ -175,6 +181,32 @@ static void analyze_statement(semantic_context_t* ctx, ast_node_t* stmt) {
             analyze_statement(ctx, stmt->as.while_stmt.body);
             break;
 
+        case AST_FOR: {
+            ctx->symtab->enter_scope(ctx->symtab);
+            ctx->total_scopes++;
+            int cur_depth = ctx->symtab->get_scope_depth(ctx->symtab);
+            if (cur_depth > ctx->max_scope_depth) ctx->max_scope_depth = cur_depth;
+
+            if (stmt->as.for_stmt.init) {
+                analyze_statement(ctx, stmt->as.for_stmt.init);
+            }
+            if (stmt->as.for_stmt.cond) {
+                analyze_expression(ctx, stmt->as.for_stmt.cond);
+            }
+            if (stmt->as.for_stmt.step) {
+                analyze_expression(ctx, stmt->as.for_stmt.step);
+            }
+            if (stmt->as.for_stmt.body) {
+                analyze_statement(ctx, stmt->as.for_stmt.body);
+            }
+            ctx->symtab->exit_scope(ctx->symtab);
+            if (ctx->step_callback) {
+                ctx->current_step++;
+                ctx->step_callback(ctx->step_user_data, ctx->current_step, mem_tracker_get_current());
+            }
+            break;
+        }
+
         default:
             analyze_expression(ctx, stmt);
             break;
@@ -186,6 +218,9 @@ bool semantic_analyze(semantic_context_t* ctx, ast_node_t* program) {
 
     /* Scope 0: Global Scope */
     ctx->symtab->enter_scope(ctx->symtab);
+    ctx->total_scopes++;
+    int d0 = ctx->symtab->get_scope_depth(ctx->symtab);
+    if (d0 > ctx->max_scope_depth) ctx->max_scope_depth = d0;
 
     for (size_t i = 0; i < program->as.program.count; i++) {
         ast_node_t* item = program->as.program.items[i];
@@ -194,29 +229,36 @@ bool semantic_analyze(semantic_context_t* ctx, ast_node_t* program) {
         if (item->kind == AST_VAR_DECL) {
             analyze_statement(ctx, item);
         } else if (item->kind == AST_STRUCT_DECL) {
-            ctx->symtab->insert(ctx->symtab, item->as.struct_decl.name, TYPE_VOID, KIND_STRUCT, 0);
+            bool ok = ctx->symtab->insert(ctx->symtab, item->as.struct_decl.name, TYPE_VOID, KIND_STRUCT, 0);
+            if (ok) ctx->total_symbols++;
         } else if (item->kind == AST_FUNC_DECL) {
             /* Insert function name into global scope */
-            ctx->symtab->insert(
+            bool ok = ctx->symtab->insert(
                 ctx->symtab,
                 item->as.func_decl.name,
                 item->as.func_decl.return_type,
                 KIND_FUNC,
                 0
             );
+            if (ok) ctx->total_symbols++;
 
             /* Function Scope */
             ctx->symtab->enter_scope(ctx->symtab);
+            ctx->total_scopes++;
+            int cur_depth = ctx->symtab->get_scope_depth(ctx->symtab);
+            if (cur_depth > ctx->max_scope_depth) ctx->max_scope_depth = cur_depth;
+
             int param_offset = 0;
             for (size_t p = 0; p < item->as.func_decl.param_count; p++) {
                 ast_node_t* param = item->as.func_decl.params[p];
-                ctx->symtab->insert(
+                bool pok = ctx->symtab->insert(
                     ctx->symtab,
                     param->as.param_decl.name,
                     param->as.param_decl.type_id,
                     KIND_PARAM,
                     param_offset
                 );
+                if (pok) ctx->total_symbols++;
                 param_offset += 4;
             }
 

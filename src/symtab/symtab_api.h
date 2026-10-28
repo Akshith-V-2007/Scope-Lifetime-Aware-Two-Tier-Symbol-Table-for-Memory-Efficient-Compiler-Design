@@ -12,6 +12,7 @@ extern "C" {
 
 typedef enum {
     SYMTAB_BASELINE = 0,
+    SYMTAB_STRONG_BASELINE,
     SYMTAB_TWOTIER,
     SYMTAB_ARENA_ONLY,
     SYMTAB_INTERN_ONLY,
@@ -63,6 +64,7 @@ struct symtab {
 
 /* Factory Functions */
 symtab_t* symtab_baseline_create(void);
+symtab_t* symtab_strong_baseline_create(void);
 symtab_t* symtab_twotier_create(int hot_depth, size_t ram_budget);
 symtab_t* symtab_ablation_create(symtab_kind_t variant);
 

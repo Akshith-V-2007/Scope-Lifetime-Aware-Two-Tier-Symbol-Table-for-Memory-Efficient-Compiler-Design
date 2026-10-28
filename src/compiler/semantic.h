@@ -22,6 +22,9 @@ typedef struct {
     semantic_step_fn step_callback;
     void*         step_user_data;
     size_t        current_step;
+    size_t        total_symbols;
+    size_t        total_scopes;
+    int           max_scope_depth;
 } semantic_context_t;
 
 void semantic_init(semantic_context_t* ctx, symtab_t* symtab, type_table_t* type_table);

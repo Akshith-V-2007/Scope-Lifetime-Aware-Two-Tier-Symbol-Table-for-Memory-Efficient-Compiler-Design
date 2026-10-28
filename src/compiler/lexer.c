@@ -43,6 +43,8 @@ const char* token_kind_name(token_kind_t kind) {
         case TOK_GT:             return ">";
         case TOK_LE:             return "<=";
         case TOK_GE:             return ">=";
+        case TOK_AMPERSAND:      return "&";
+        case TOK_PERCENT:        return "%";
         default:                 return "ERROR";
     }
 }
@@ -190,6 +192,8 @@ token_t lexer_next_token(lexer_t* lexer) {
         case '+': return make_token(lexer, TOK_PLUS, start, 1, line, col);
         case '*': return make_token(lexer, TOK_STAR, start, 1, line, col);
         case '/': return make_token(lexer, TOK_SLASH, start, 1, line, col);
+        case '&': return make_token(lexer, TOK_AMPERSAND, start, 1, line, col);
+        case '%': return make_token(lexer, TOK_PERCENT, start, 1, line, col);
         case '-':
             if (*lexer->cursor == '>') {
                 lexer->cursor++;

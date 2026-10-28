@@ -1,0 +1,16 @@
+engine,op_type,p50_ns,p95_ns,p99_ns,iqr_ns
+baseline,insert,189.00,232.60,232.60,16.20
+strong_baseline,insert,156.60,234.60,234.60,32.80
+twotier,insert,338.40,401.00,401.00,53.40
+baseline,hot_lookup,42.00,44.95,44.95,0.75
+strong_baseline,hot_lookup,39.25,42.05,42.05,0.40
+twotier,hot_lookup,39.60,45.95,45.95,0.60
+baseline,outer_scope_lookup,87.20,90.55,90.55,1.10
+strong_baseline,outer_scope_lookup,27.30,31.45,31.45,0.30
+twotier,outer_scope_lookup,36.05,36.40,36.40,0.20
+baseline,cold_lookup_forced,45.67,58.50,58.50,13.00
+strong_baseline,cold_lookup_forced,24.33,40.17,40.17,7.67
+twotier,cold_lookup_forced,231.33,286.17,286.17,61.50
+baseline,miss_lookup,73.75,79.90,79.90,0.70
+strong_baseline,miss_lookup,13.65,14.00,14.00,0.25
+twotier,miss_lookup,36.40,37.55,37.55,0.90

@@ -52,21 +52,23 @@ os.makedirs(OUT_DIR, exist_ok=True)
 
 # Okabe-Ito Colorblind-Safe Palette
 ENGINE_COLORS = {
-    'baseline': '#000000',       # Black
-    'arena':    '#E69F00',       # Orange
-    'intern':   '#F0E442',       # Yellow
-    'packed':   '#56B4E9',       # Sky Blue
-    'nombloom': '#CC79A7',       # Purple / Pink
-    'twotier':  '#0072B2'        # Deep Blue
+    'baseline':        '#000000',       # Black
+    'strong_baseline': '#009E73',       # Bluish Green
+    'arena':           '#E69F00',       # Orange
+    'intern':          '#F0E442',       # Yellow
+    'packed':          '#56B4E9',       # Sky Blue
+    'nombloom':        '#CC79A7',       # Purple / Pink
+    'twotier':         '#0072B2'        # Deep Blue
 }
 
 ENGINE_HATCHES = {
-    'baseline': '',
-    'arena':    '//',
-    'intern':   '\\\\',
-    'packed':   'xx',
-    'nombloom': '..',
-    'twotier':  '++'
+    'baseline':        '',
+    'strong_baseline': '//',
+    'arena':           '\\\\',
+    'intern':          '--',
+    'packed':          'xx',
+    'nombloom':        '..',
+    'twotier':         '++'
 }
 
 def save_fig(fig, base_name):
@@ -96,11 +98,20 @@ def plot_fig1_peak_ram():
         'embedded_flight_controller.mc', 'synthetic_broad_scope.mc',
         'synthetic_heavy_shadowing.mc', 'synthetic_deep_nesting.mc'
     ]
-    engines = ['baseline', 'arena', 'intern', 'packed', 'nombloom', 'twotier']
+    engines = ['baseline', 'strong_baseline', 'arena', 'intern', 'packed', 'nombloom', 'twotier']
+    engine_labels = {
+        'baseline': 'Baseline',
+        'strong_baseline': 'Strong Base',
+        'arena': 'Arena',
+        'intern': 'Intern',
+        'packed': 'Packed',
+        'nombloom': 'No-Bloom',
+        'twotier': 'Two-Tier'
+    }
     labels = ['Arduino', 'FreeRTOS', 'Zephyr', 'MiBench', 'Flight Ctrl', 'Broad Scp', 'Shadowing', 'Deep Nest']
 
     x = np.arange(len(workloads))
-    width = 0.13
+    width = 0.11
 
     fig, ax = plt.subplots(figsize=(7.0, 3.2))
 
@@ -113,9 +124,9 @@ def plot_fig1_peak_ram():
             medians.append(np.median(vals) / 1024.0) # in KB
             iqrs.append((q75 - q25) / 1024.0)
 
-        offset = (i - 2.5) * width
+        offset = (i - 3.0) * width
         ax.bar(x + offset, medians, width, yerr=iqrs, capsize=2,
-               label=eng.capitalize(), color=ENGINE_COLORS[eng],
+               label=engine_labels.get(eng, eng.capitalize()), color=ENGINE_COLORS[eng],
                hatch=ENGINE_HATCHES[eng], edgecolor='#334155', alpha=0.85)
 
     ax.set_ylabel('Peak RAM (KB)')
@@ -126,7 +137,7 @@ def plot_fig1_peak_ram():
     ax.set_yticks([2, 5, 10, 20, 40, 60])
     ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
     ax.yaxis.set_minor_formatter(ticker.NullFormatter())
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.22), ncol=6, frameon=True, framealpha=0.9, fontsize=8)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.22), ncol=4, frameon=True, framealpha=0.9, fontsize=7.5)
     save_fig(fig, 'fig1_peak_ram_grouped')
 
 # =========================================================================
@@ -262,48 +273,61 @@ def plot_fig4_k_pareto():
     save_fig(fig, 'fig4_k_pareto_curve')
 
 # =========================================================================
-# Figure 5: Micro-Latency Breakdown CDFs / Boxplots
+# Figure 5: Micro-Latency Breakdown Across Engines
 # =========================================================================
 def plot_fig5_latency_cdfs():
+    summary_path = os.path.join('bench', 'results', 'latency_summary.csv')
     csv_path = os.path.join('bench', 'results', 'exp4_micro_latency.csv')
-    if not os.path.exists(csv_path): return
 
-    base_by_op = {}
-    two_by_op = {}
+    ops = ['insert', 'hot_lookup', 'outer_scope_lookup', 'cold_lookup_forced', 'miss_lookup']
+    labels = ['Insert', 'Hot Hit', 'Outer Scope', 'Forced Decomp', 'Miss']
+    engines = ['baseline', 'strong_baseline', 'twotier']
 
-    with open(csv_path, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for r in reader:
-            op = r['op_type']
-            lat = float(r['latency_ns'])
-            if r['engine'] == 'baseline':
-                base_by_op.setdefault(op, []).append(lat)
-            else:
-                two_by_op.setdefault(op, []).append(lat)
+    meds = {eng: [] for eng in engines}
+    iqrs = {eng: [] for eng in engines}
 
-    ops = ['insert', 'hot_lookup', 'cold_lookup_warm', 'cold_lookup_forced', 'miss_lookup']
-    labels = ['Insert', 'Hot Hit', 'Cold Warm', 'Forced Decomp', 'Miss']
+    if os.path.exists(summary_path):
+        data = {}
+        with open(summary_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for r in reader:
+                data[(r['engine'], r['op_type'])] = (float(r['p50_ns']), float(r['iqr_ns']))
+        for op in ops:
+            for eng in engines:
+                m, q = data.get((eng, op), (0.0, 0.0))
+                meds[eng].append(m)
+                iqrs[eng].append(q)
+    elif os.path.exists(csv_path):
+        runs = {}
+        with open(csv_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for r in reader:
+                runs.setdefault((r['engine'], r['op_type']), []).append(float(r['latency_ns']))
+        for op in ops:
+            for eng in engines:
+                vals = runs.get((eng, op), [0.0])
+                q75, q25 = np.percentile(vals, [75, 25])
+                meds[eng].append(float(np.median(vals)))
+                iqrs[eng].append(float(q75 - q25))
+    else:
+        return
 
-    fig, ax = plt.subplots(figsize=(3.5, 2.8))
+    fig, ax = plt.subplots(figsize=(4.0, 2.9))
     x = np.arange(len(ops))
-    width = 0.35
+    width = 0.26
 
-    b_meds = [np.median(base_by_op.get(op, [0])) for op in ops]
-    b_iqrs = [np.percentile(base_by_op.get(op, [0]), 75) - np.percentile(base_by_op.get(op, [0]), 25) for op in ops]
-
-    t_meds = [np.median(two_by_op.get(op, [0])) for op in ops]
-    t_iqrs = [np.percentile(two_by_op.get(op, [0]), 75) - np.percentile(two_by_op.get(op, [0]), 25) for op in ops]
-
-    ax.bar(x - width/2, b_meds, width, yerr=b_iqrs, capsize=2, label='Baseline',
-           color=ENGINE_COLORS['baseline'], hatch='', edgecolor='#0f172a', alpha=0.75)
-    ax.bar(x + width/2, t_meds, width, yerr=t_iqrs, capsize=2, label='Two-Tier',
-           color=ENGINE_COLORS['twotier'], hatch='++', edgecolor='#0f172a', alpha=0.85)
+    for i, eng in enumerate(engines):
+        offset = (i - 1.0) * width
+        disp_name = 'Baseline' if eng == 'baseline' else ('Strong Base' if eng == 'strong_baseline' else 'Two-Tier')
+        ax.bar(x + offset, meds[eng], width, yerr=iqrs[eng], capsize=2,
+               label=disp_name, color=ENGINE_COLORS[eng], hatch=ENGINE_HATCHES[eng],
+               edgecolor='#0f172a', alpha=0.85)
 
     ax.set_ylabel('Latency (ns / op)')
     ax.set_yscale('log')
     ax.set_xticks(x)
     ax.set_xticklabels(labels, rotation=15, ha='right', fontsize=7.5)
-    ax.legend(loc='upper right', frameon=True)
+    ax.legend(loc='upper right', frameon=True, fontsize=7.5)
     save_fig(fig, 'fig5_latency_cdfs')
 
 # =========================================================================
@@ -313,33 +337,36 @@ def plot_fig6_scope_scaling():
     csv_path = os.path.join('bench', 'results', 'exp5_scope_scaling.csv')
     if not os.path.exists(csv_path): return
 
-    b_times = {}
-    t_times = {}
+    times = {'baseline': {}, 'strong_baseline': {}, 'twotier': {}}
 
     with open(csv_path, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for r in reader:
-            n = int(r['symbols_per_scope'])
-            val = float(r['enter_exit_time_ns']) / 1000.0 # us
-            if r['engine'] == 'baseline':
-                b_times.setdefault(n, []).append(val)
-            else:
-                t_times.setdefault(n, []).append(val)
+            eng = r['engine']
+            if eng in times:
+                n = int(r['symbols_per_scope'])
+                val = float(r['enter_exit_time_ns']) / 1000.0 # us
+                times[eng].setdefault(n, []).append(val)
 
-    counts = sorted(list(b_times.keys()))
-    b_med = [np.median(b_times[n]) for n in counts]
-    t_med = [np.median(t_times[n]) for n in counts]
+    counts = sorted(list(times['baseline'].keys()))
+    if not counts: return
 
-    fig, ax = plt.subplots(figsize=(3.5, 2.8))
+    b_med = [np.median(times['baseline'].get(n, [0])) for n in counts]
+    s_med = [np.median(times['strong_baseline'].get(n, [0])) for n in counts]
+    t_med = [np.median(times['twotier'].get(n, [0])) for n in counts]
+
+    fig, ax = plt.subplots(figsize=(3.6, 2.9))
 
     ax.plot(counts, b_med, 's--', color=ENGINE_COLORS['baseline'], label='Baseline (Chained free)')
+    if any(s_med):
+        ax.plot(counts, s_med, '^-.', color=ENGINE_COLORS['strong_baseline'], label='Strong Base (Arena + Shift)')
     ax.plot(counts, t_med, 'o-', color=ENGINE_COLORS['twotier'], label='Two-Tier (Arena + Sweep)')
 
     ax.set_xscale('log')
     ax.set_yscale('log')
     ax.set_xlabel('Symbols Per Scope (N)')
     ax.set_ylabel('Lifecycle Teardown Time (µs)')
-    ax.legend(loc='upper left', frameon=True)
+    ax.legend(loc='upper left', frameon=True, fontsize=7.5)
     save_fig(fig, 'fig6_scope_scaling')
 
 # =========================================================================

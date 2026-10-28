@@ -57,10 +57,37 @@ static double get_time_ns(void) {
 #include "../src/common/arena.h"
 #include "../src/symtab/symtab_api.h"
 #include "../src/symtab/symtab_baseline.h"
+#include "../src/symtab/symtab_strong_baseline.h"
 #include "../src/symtab/symtab_twotier.h"
 #include "../src/symtab/symtab_ablation.h"
 #include "../src/compiler/parser.h"
 #include "../src/compiler/semantic.h"
+
+#if defined(_WIN32) || defined(_WIN64)
+#include <psapi.h>
+static size_t get_process_peak_rss(void) {
+    PROCESS_MEMORY_COUNTERS pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
+        return (size_t)pmc.PeakWorkingSetSize;
+    }
+    return 0;
+}
+#elif defined(__linux__) || defined(__unix__) || defined(__APPLE__)
+#include <sys/resource.h>
+static size_t get_process_peak_rss(void) {
+    struct rusage ru;
+    if (getrusage(RUSAGE_SELF, &ru) == 0) {
+#if defined(__APPLE__)
+        return (size_t)ru.ru_maxrss;
+#else
+        return (size_t)ru.ru_maxrss * 1024;
+#endif
+    }
+    return 0;
+}
+#else
+static size_t get_process_peak_rss(void) { return 0; }
+#endif
 
 #define NUM_RUNS 15
 
@@ -76,8 +103,17 @@ static const char* ALL_WORKLOADS[] = {
 };
 #define NUM_WORKLOADS (sizeof(ALL_WORKLOADS) / sizeof(ALL_WORKLOADS[0]))
 
+static const char* EXTENDED_REAL_WORKLOADS[] = {
+    "data/freertos_queue.mc",
+    "data/mibench_qsort.mc",
+    "data/mibench_bitcount.mc",
+    "data/zephyr_synopsys.mc"
+};
+#define NUM_EXTENDED_WORKLOADS (sizeof(EXTENDED_REAL_WORKLOADS) / sizeof(EXTENDED_REAL_WORKLOADS[0]))
+
 static const char* ALL_ENGINES[] = {
     "baseline",
+    "strong_baseline",
     "arena",
     "intern",
     "packed",
@@ -126,6 +162,26 @@ static void calc_median_iqr(double* arr, size_t n, double* out_med, double* out_
     if (out_iqr) *out_iqr = (q3 - q1);
 }
 
+static void calc_quantiles(double* arr, size_t n, double* out_p50, double* out_p95, double* out_p99, double* out_iqr) {
+    if (n == 0) {
+        if (out_p50) *out_p50 = 0.0;
+        if (out_p95) *out_p95 = 0.0;
+        if (out_p99) *out_p99 = 0.0;
+        if (out_iqr) *out_iqr = 0.0;
+        return;
+    }
+    qsort(arr, n, sizeof(double), compare_doubles);
+    double p50 = (n % 2 == 1) ? arr[n / 2] : (arr[n / 2 - 1] + arr[n / 2]) * 0.5;
+    size_t idx95 = (size_t)(0.95 * (n - 1));
+    size_t idx99 = (size_t)(0.99 * (n - 1));
+    size_t q1_idx = (size_t)(0.25 * (n - 1));
+    size_t q3_idx = (size_t)(0.75 * (n - 1));
+    if (out_p50) *out_p50 = p50;
+    if (out_p95) *out_p95 = arr[idx95];
+    if (out_p99) *out_p99 = arr[idx99];
+    if (out_iqr) *out_iqr = arr[q3_idx] - arr[q1_idx];
+}
+
 static char* read_entire_file(const char* path) {
     FILE* f = fopen(path, "rb");
     if (!f) return NULL;
@@ -147,12 +203,13 @@ static const char* get_base_name(const char* path) {
 }
 
 static symtab_t* create_engine(const char* engine, int hot_depth, size_t ram_budget) {
-    if (strcmp(engine, "baseline") == 0) return symtab_baseline_create();
-    if (strcmp(engine, "arena") == 0)    return symtab_ablation_create(SYMTAB_ARENA_ONLY);
-    if (strcmp(engine, "intern") == 0)   return symtab_ablation_create(SYMTAB_INTERN_ONLY);
-    if (strcmp(engine, "packed") == 0)   return symtab_ablation_create(SYMTAB_PACKED_ONLY);
-    if (strcmp(engine, "nombloom") == 0) return symtab_ablation_create(SYMTAB_COMPRESSED_NO_BLOOM);
-    if (strcmp(engine, "twotier") == 0)  return symtab_twotier_create(hot_depth, ram_budget);
+    if (strcmp(engine, "baseline") == 0)        return symtab_baseline_create();
+    if (strcmp(engine, "strong_baseline") == 0) return symtab_strong_baseline_create();
+    if (strcmp(engine, "arena") == 0)           return symtab_ablation_create(SYMTAB_ARENA_ONLY);
+    if (strcmp(engine, "intern") == 0)          return symtab_ablation_create(SYMTAB_INTERN_ONLY);
+    if (strcmp(engine, "packed") == 0)          return symtab_ablation_create(SYMTAB_PACKED_ONLY);
+    if (strcmp(engine, "nombloom") == 0)        return symtab_ablation_create(SYMTAB_COMPRESSED_NO_BLOOM);
+    if (strcmp(engine, "twotier") == 0)         return symtab_twotier_create(hot_depth, ram_budget);
     return NULL;
 }
 
@@ -341,6 +398,8 @@ static void run_experiment_1(FILE* legacy_csv) {
 
         double base_ram = 0.0;
         double base_time = 0.0;
+        double strong_ram = 0.0;
+        double strong_time = 0.0;
         double two_ram = 0.0;
         double two_time = 0.0;
         uint64_t two_decomps = 0;
@@ -392,6 +451,16 @@ static void run_experiment_1(FILE* legacy_csv) {
                             (unsigned long long)bloom_skips, (unsigned long long)decomps,
                             med_bps, med_time);
                 }
+            } else if (strcmp(eng, "strong_baseline") == 0) {
+                strong_ram = med_ram;
+                strong_time = med_time;
+                if (legacy_csv) {
+                    fprintf(legacy_csv, "exp1,%s,strong_baseline,%zu,%zu,%zu,%llu,%llu,%llu,%llu,%.2f,%.1f,%.2f\n",
+                            get_base_name(ALL_WORKLOADS[w]), (size_t)med_ram, inserts, lookups,
+                            (unsigned long long)hot_hits, (unsigned long long)cold_hits,
+                            (unsigned long long)bloom_skips, (unsigned long long)decomps,
+                            med_bps, med_time, (base_time > 0.0) ? (strong_time / base_time) : 1.0);
+                }
             } else if (strcmp(eng, "twotier") == 0) {
                 two_ram = med_ram;
                 two_time = med_time;
@@ -409,6 +478,7 @@ static void run_experiment_1(FILE* legacy_csv) {
 
         double diff = (base_ram > 0.0) ? ((1.0 - two_ram / base_ram) * 100.0) : 0.0;
         double slowdown = (base_time > 0.0) ? (two_time / base_time) : 1.0;
+        (void)strong_ram; (void)strong_time;
 
         if (diff >= 0.0) {
             printf("%-26s | %9zu B  | %9zu B  | -%5.1f%% (saved) | %6.2fx slowdown  | %7llu\n",
@@ -553,19 +623,24 @@ static void run_experiment_3(void) {
 }
 
 /* =========================================================================
- * EXPERIMENT 4: Micro-Latency Breakdown (Insert, Hot, Cold-Warm, Cold-Forced, Miss)
+ * EXPERIMENT 4: Micro-Latency Breakdown (Insert, Hot, Outer, Forced, Miss)
  * ========================================================================= */
 static void run_experiment_4(FILE* legacy_csv) {
     printf("\n=========================================================================================================================\n");
-    printf(" EXPERIMENT 4: Micro-Latency Breakdown (p50 / p95 / p99 / IQR Across %d Runs)\n", NUM_RUNS);
+    printf(" EXPERIMENT 4: Micro-Latency Breakdown across 3 Engines (p50 / p95 / p99 / IQR Across %d Runs)\n", NUM_RUNS);
     printf("=========================================================================================================================\n");
-    printf("%-28s | %-15s | %-15s | %-12s | %-18s\n",
-           "Operation Type", "Baseline (p50)", "Two-Tier (p50)", "Speed Ratio", "Profile");
+    printf("%-22s | %-15s | %-15s | %-15s | %-12s | %-12s\n",
+           "Operation Type", "Baseline (p50)", "StrongBase(p50)", "Two-Tier (p50)", "vs Baseline", "vs StrongBase");
     printf("-------------------------------------------------------------------------------------------------------------------------\n");
 
     FILE* csv = fopen("bench/results/exp4_micro_latency.csv", "w");
     if (csv) {
-        fprintf(csv, "run_id,op_type,engine,latency_ns,p50_ns,p95_ns,p99_ns,iqr_ns\n");
+        fprintf(csv, "run_id,op_type,engine,latency_ns\n");
+    }
+
+    FILE* sum_csv = fopen("bench/results/latency_summary.csv", "w");
+    if (sum_csv) {
+        fprintf(sum_csv, "engine,op_type,p50_ns,p95_ns,p99_ns,iqr_ns\n");
     }
 
     #define NUM_INSERTS 500
@@ -593,15 +668,16 @@ static void run_experiment_4(FILE* legacy_csv) {
     const char* ops[] = {
         "insert",
         "hot_lookup",
-        "cold_lookup_warm",
+        "outer_scope_lookup",
         "cold_lookup_forced",
         "miss_lookup"
     };
 
-    double base_meds[5], two_meds[5], base_iqrs[5], two_iqrs[5];
+    double base_meds[5], strong_meds[5], two_meds[5];
 
     for (int op_idx = 0; op_idx < 5; op_idx++) {
         double b_samples[NUM_RUNS];
+        double s_samples[NUM_RUNS];
         double t_samples[NUM_RUNS];
 
         for (int r = 0; r < NUM_RUNS; r++) {
@@ -617,6 +693,15 @@ static void run_experiment_4(FILE* legacy_csv) {
                 double bt1 = get_time_ns();
                 b_samples[r] = (bt1 - bt0) / (double)NUM_INSERTS;
                 btab->destroy(btab);
+
+                mem_tracker_reset();
+                symtab_t* stab = symtab_strong_baseline_create();
+                stab->enter_scope(stab);
+                double st0 = get_time_ns();
+                for (int i = 0; i < NUM_INSERTS; i++) stab->insert(stab, names[i], TYPE_INT, KIND_VAR, i * 4);
+                double st1 = get_time_ns();
+                s_samples[r] = (st1 - st0) / (double)NUM_INSERTS;
+                stab->destroy(stab);
 
                 mem_tracker_reset();
                 symtab_t* ttab = symtab_twotier_create(2, 0);
@@ -639,6 +724,16 @@ static void run_experiment_4(FILE* legacy_csv) {
                 btab->destroy(btab);
 
                 mem_tracker_reset();
+                symtab_t* stab = symtab_strong_baseline_create();
+                stab->enter_scope(stab);
+                for (int i = 0; i < NUM_INSERTS; i++) stab->insert(stab, names[i], TYPE_INT, KIND_VAR, i * 4);
+                double st0 = get_time_ns();
+                for (int i = 0; i < NUM_OPS; i++) stab->lookup(stab, names[i % NUM_INSERTS]);
+                double st1 = get_time_ns();
+                s_samples[r] = (st1 - st0) / (double)NUM_OPS;
+                stab->destroy(stab);
+
+                mem_tracker_reset();
                 symtab_t* ttab = symtab_twotier_create(2, 0);
                 ttab->enter_scope(ttab);
                 for (int i = 0; i < NUM_INSERTS; i++) ttab->insert(ttab, names[i], TYPE_INT, KIND_VAR, i * 4);
@@ -648,7 +743,7 @@ static void run_experiment_4(FILE* legacy_csv) {
                 t_samples[r] = (tt1 - tt0) / (double)NUM_OPS;
                 ttab->destroy(ttab);
             } else if (op_idx == 2) {
-                /* Cold lookup warm */
+                /* Outer scope lookup / Cold lookup warm */
                 mem_tracker_reset();
                 symtab_t* btab = symtab_baseline_create();
                 btab->enter_scope(btab);
@@ -661,6 +756,17 @@ static void run_experiment_4(FILE* legacy_csv) {
                 btab->destroy(btab);
 
                 mem_tracker_reset();
+                symtab_t* stab = symtab_strong_baseline_create();
+                stab->enter_scope(stab);
+                for (int i = 0; i < NUM_INSERTS; i++) stab->insert(stab, names[i], TYPE_INT, KIND_VAR, i * 4);
+                for (int d = 0; d < 4; d++) stab->enter_scope(stab);
+                double st0 = get_time_ns();
+                for (int i = 0; i < NUM_OPS; i++) stab->lookup(stab, names[i % 50]);
+                double st1 = get_time_ns();
+                s_samples[r] = (st1 - st0) / (double)NUM_OPS;
+                stab->destroy(stab);
+
+                mem_tracker_reset();
                 symtab_t* ttab = symtab_twotier_create(2, 0);
                 ttab->enter_scope(ttab);
                 for (int i = 0; i < NUM_INSERTS; i++) ttab->insert(ttab, names[i], TYPE_INT, KIND_VAR, i * 4);
@@ -671,7 +777,7 @@ static void run_experiment_4(FILE* legacy_csv) {
                 t_samples[r] = (tt1 - tt0) / (double)NUM_OPS;
                 ttab->destroy(ttab);
             } else if (op_idx == 3) {
-                /* Cold forced decompress (cache-defeating) */
+                /* Cold forced decompress (cache-defeating) / Deep ancestor lookup */
                 mem_tracker_reset();
                 symtab_t* btab = symtab_baseline_create();
                 for (int s = 0; s < 4; s++) {
@@ -684,6 +790,19 @@ static void run_experiment_4(FILE* legacy_csv) {
                 double bt1 = get_time_ns();
                 b_samples[r] = (bt1 - bt0) / (double)NUM_FORCED;
                 btab->destroy(btab);
+
+                mem_tracker_reset();
+                symtab_t* stab = symtab_strong_baseline_create();
+                for (int s = 0; s < 4; s++) {
+                    stab->enter_scope(stab);
+                    for (int v = 0; v < 30; v++) stab->insert(stab, cold_vars[s][v], TYPE_INT, KIND_VAR, v * 4);
+                }
+                for (int s = 0; s < 2; s++) stab->enter_scope(stab);
+                double st0 = get_time_ns();
+                for (int i = 0; i < NUM_FORCED; i++) stab->lookup(stab, forced_queries[i]);
+                double st1 = get_time_ns();
+                s_samples[r] = (st1 - st0) / (double)NUM_FORCED;
+                stab->destroy(stab);
 
                 mem_tracker_reset();
                 symtab_t* ttab = symtab_twotier_create(2, 0);
@@ -711,6 +830,17 @@ static void run_experiment_4(FILE* legacy_csv) {
                 btab->destroy(btab);
 
                 mem_tracker_reset();
+                symtab_t* stab = symtab_strong_baseline_create();
+                stab->enter_scope(stab);
+                for (int i = 0; i < NUM_INSERTS; i++) stab->insert(stab, names[i], TYPE_INT, KIND_VAR, i * 4);
+                for (int d = 0; d < 4; d++) stab->enter_scope(stab);
+                double st0 = get_time_ns();
+                for (int i = 0; i < NUM_OPS; i++) stab->lookup(stab, absent[i % 100]);
+                double st1 = get_time_ns();
+                s_samples[r] = (st1 - st0) / (double)NUM_OPS;
+                stab->destroy(stab);
+
+                mem_tracker_reset();
                 symtab_t* ttab = symtab_twotier_create(2, 0);
                 ttab->enter_scope(ttab);
                 for (int i = 0; i < NUM_INSERTS; i++) ttab->insert(ttab, names[i], TYPE_INT, KIND_VAR, i * 4);
@@ -723,98 +853,159 @@ static void run_experiment_4(FILE* legacy_csv) {
             }
 
             if (csv) {
-                fprintf(csv, "%d,%s,baseline,%.2f,0,0,0,0\n", r + 1, ops[op_idx], b_samples[r]);
-                fprintf(csv, "%d,%s,twotier,%.2f,0,0,0,0\n", r + 1, ops[op_idx], t_samples[r]);
+                fprintf(csv, "%d,%s,baseline,%.2f\n", r + 1, ops[op_idx], b_samples[r]);
+                fprintf(csv, "%d,%s,strong_baseline,%.2f\n", r + 1, ops[op_idx], s_samples[r]);
+                fprintf(csv, "%d,%s,twotier,%.2f\n", r + 1, ops[op_idx], t_samples[r]);
             }
         }
 
-        calc_median_iqr(b_samples, NUM_RUNS, &base_meds[op_idx], &base_iqrs[op_idx]);
-        calc_median_iqr(t_samples, NUM_RUNS, &two_meds[op_idx], &two_iqrs[op_idx]);
+        double b_p50, b_p95, b_p99, b_iqr;
+        double s_p50, s_p95, s_p99, s_iqr;
+        double t_p50, t_p95, t_p99, t_iqr;
 
-        double ratio = (base_meds[op_idx] > 0.0) ? (two_meds[op_idx] / base_meds[op_idx]) : 1.0;
-        const char* label = ops[op_idx];
-        const char* profile = (ratio <= 1.0) ? "Faster" : "Slower";
+        calc_quantiles(b_samples, NUM_RUNS, &b_p50, &b_p95, &b_p99, &b_iqr);
+        calc_quantiles(s_samples, NUM_RUNS, &s_p50, &s_p95, &s_p99, &s_iqr);
+        calc_quantiles(t_samples, NUM_RUNS, &t_p50, &t_p95, &t_p99, &t_iqr);
 
-        printf("%-28s | %9.1f ns/op   | %9.1f ns/op   | %6.2fx       | %s\n",
-               label, base_meds[op_idx], two_meds[op_idx], ratio, profile);
+        base_meds[op_idx] = b_p50;
+        strong_meds[op_idx] = s_p50;
+        two_meds[op_idx] = t_p50;
+
+        if (sum_csv) {
+            fprintf(sum_csv, "baseline,%s,%.2f,%.2f,%.2f,%.2f\n", ops[op_idx], b_p50, b_p95, b_p99, b_iqr);
+            fprintf(sum_csv, "strong_baseline,%s,%.2f,%.2f,%.2f,%.2f\n", ops[op_idx], s_p50, s_p95, s_p99, s_iqr);
+            fprintf(sum_csv, "twotier,%s,%.2f,%.2f,%.2f,%.2f\n", ops[op_idx], t_p50, t_p95, t_p99, t_iqr);
+        }
+
+        double ratio_base = (b_p50 > 0.0) ? (t_p50 / b_p50) : 1.0;
+        double ratio_strong = (s_p50 > 0.0) ? (t_p50 / s_p50) : 1.0;
+
+        printf("%-22s | %9.1f ns/op   | %9.1f ns/op   | %9.1f ns/op   | %6.2fx       | %6.2fx\n",
+               ops[op_idx], b_p50, s_p50, t_p50, ratio_base, ratio_strong);
+        (void)base_meds; (void)strong_meds; (void)two_meds;
 
         if (legacy_csv) {
             fprintf(legacy_csv, "exp5_latency,%s,%d,0,0,0,0,0,0,0,0.0,%.2f,%.2f\n",
                     ops[op_idx], (op_idx == 0) ? NUM_INSERTS : (op_idx == 3 ? NUM_FORCED : NUM_OPS),
-                    two_meds[op_idx], ratio);
+                    t_p50, ratio_base);
         }
     }
 
     if (csv) fclose(csv);
+    if (sum_csv) fclose(sum_csv);
     printf("=========================================================================================================================\n");
 }
 
 /* =========================================================================
- * EXPERIMENT 5: Scope Enter/Exit Lifecycle Scaling (10, 100, 1000 Symbols)
+ * EXPERIMENT 5: Scope Enter/Exit Lifecycle Scaling (1 to 1000 Symbols)
  * ========================================================================= */
 static void run_experiment_5(FILE* legacy_csv) {
     printf("\n=========================================================================================================================\n");
-    printf(" EXPERIMENT 5: Scope Lifecycle Scaling (Enter + Insert N + Teardown) [%d Runs]\n", NUM_RUNS);
-    printf(" Question: How does Two-Tier's arena + hot-table sweep scale compared to Baseline's chained free?\n");
+    printf(" EXPERIMENT 5: Scope Lifecycle Scaling (Enter + Insert N + Teardown) [%d Recorded Runs, 2 Discarded Warmups]\n", NUM_RUNS);
+    printf(" Question: How does Two-Tier's arena + hot-table sweep scale compared to Baseline and Strong Baseline?\n");
     printf("=========================================================================================================================\n");
-    printf("%-24s | %-16s | %-16s | %-12s | %-24s\n",
-           "Symbols Per Scope", "Baseline Time", "Two-Tier Time", "Ratio", "Teardown Mechanism");
+    printf("%-20s | %-15s | %-15s | %-15s | %-12s | %-12s\n",
+           "Symbols Per Scope", "Baseline Time", "Strong Base", "Two-Tier Time", "vs Baseline", "vs StrongBase");
     printf("-------------------------------------------------------------------------------------------------------------------------\n");
 
     FILE* csv = fopen("bench/results/exp5_scope_scaling.csv", "w");
     if (csv) {
-        fprintf(csv, "run_id,engine,symbols_per_scope,enter_exit_time_ns\n");
+        fprintf(csv, "run_id,engine,symbols_per_scope,enter_exit_time_ns,exit_time_ns\n");
     }
 
-    int counts[] = { 10, 100, 1000 };
-    for (int c = 0; c < 3; c++) {
+    int counts[] = { 1, 5, 10, 50, 100, 500, 1000 };
+    size_t num_counts = sizeof(counts) / sizeof(counts[0]);
+
+    for (size_t c = 0; c < num_counts; c++) {
         int N = counts[c];
         char syms[1000][32];
         for (int i = 0; i < N; i++) snprintf(syms[i], sizeof(syms[i]), "var_%04d", i);
 
         double base_runs[NUM_RUNS];
+        double strong_runs[NUM_RUNS];
         double two_runs[NUM_RUNS];
+        double base_exit_runs[NUM_RUNS];
+        double strong_exit_runs[NUM_RUNS];
+        double two_exit_runs[NUM_RUNS];
 
-        for (int r = 0; r < NUM_RUNS; r++) {
-            /* Baseline */
+        int recorded_idx = 0;
+        int total_runs = NUM_RUNS + 2; /* 2 warm-up runs discarded */
+
+        for (int r = 0; r < total_runs; r++) {
+            /* 1. Baseline */
             mem_tracker_reset();
             symtab_t* btab = symtab_baseline_create();
             double bt0 = get_time_ns();
             btab->enter_scope(btab);
             for (int i = 0; i < N; i++) btab->insert(btab, syms[i], TYPE_INT, KIND_VAR, i * 4);
+            double be0 = get_time_ns();
             btab->exit_scope(btab);
-            double bt1 = get_time_ns();
-            base_runs[r] = (bt1 - bt0);
+            double be1 = get_time_ns();
+            double bt1 = be1;
+            double b_tot = (bt1 - bt0);
+            double b_exit = (be1 - be0);
             btab->destroy(btab);
 
-            /* Two-Tier */
+            /* 2. Strong Baseline */
+            mem_tracker_reset();
+            symtab_t* stab = symtab_strong_baseline_create();
+            double st0 = get_time_ns();
+            stab->enter_scope(stab);
+            for (int i = 0; i < N; i++) stab->insert(stab, syms[i], TYPE_INT, KIND_VAR, i * 4);
+            double se0 = get_time_ns();
+            stab->exit_scope(stab);
+            double se1 = get_time_ns();
+            double st1 = se1;
+            double s_tot = (st1 - st0);
+            double s_exit = (se1 - se0);
+            stab->destroy(stab);
+
+            /* 3. Two-Tier */
             mem_tracker_reset();
             symtab_t* ttab = symtab_twotier_create(2, 0);
             double tt0 = get_time_ns();
             ttab->enter_scope(ttab);
             for (int i = 0; i < N; i++) ttab->insert(ttab, syms[i], TYPE_INT, KIND_VAR, i * 4);
+            double te0 = get_time_ns();
             ttab->exit_scope(ttab);
-            double tt1 = get_time_ns();
-            two_runs[r] = (tt1 - tt0);
+            double te1 = get_time_ns();
+            double tt1 = te1;
+            double t_tot = (tt1 - tt0);
+            double t_exit = (te1 - te0);
             ttab->destroy(ttab);
 
-            if (csv) {
-                fprintf(csv, "%d,baseline,%d,%.1f\n", r + 1, N, base_runs[r]);
-                fprintf(csv, "%d,twotier,%d,%.1f\n", r + 1, N, two_runs[r]);
+            if (r >= 2 && recorded_idx < NUM_RUNS) {
+                base_runs[recorded_idx] = b_tot;
+                strong_runs[recorded_idx] = s_tot;
+                two_runs[recorded_idx] = t_tot;
+                base_exit_runs[recorded_idx] = b_exit;
+                strong_exit_runs[recorded_idx] = s_exit;
+                two_exit_runs[recorded_idx] = t_exit;
+
+                if (csv) {
+                    fprintf(csv, "%d,baseline,%d,%.1f,%.1f\n", recorded_idx + 1, N, b_tot, b_exit);
+                    fprintf(csv, "%d,strong_baseline,%d,%.1f,%.1f\n", recorded_idx + 1, N, s_tot, s_exit);
+                    fprintf(csv, "%d,twotier,%d,%.1f,%.1f\n", recorded_idx + 1, N, t_tot, t_exit);
+                }
+                recorded_idx++;
             }
         }
 
-        double med_base, iqr_base, med_two, iqr_two;
+        double med_base, iqr_base, med_strong, iqr_strong, med_two, iqr_two;
         calc_median_iqr(base_runs, NUM_RUNS, &med_base, &iqr_base);
+        calc_median_iqr(strong_runs, NUM_RUNS, &med_strong, &iqr_strong);
         calc_median_iqr(two_runs, NUM_RUNS, &med_two, &iqr_two);
-        double ratio = (med_base > 0.0) ? (med_two / med_base) : 1.0;
 
-        printf("N = %-20d | %10.1f ns      | %10.1f ns      | %6.2fx       | arena + hot-table sweep\n",
-               N, med_base, med_two, ratio);
+        double ratio_base = (med_base > 0.0) ? (med_two / med_base) : 1.0;
+        double ratio_strong = (med_strong > 0.0) ? (med_two / med_strong) : 1.0;
 
-        if (c == 1 && legacy_csv) {
+        printf("N = %-16d | %10.1f ns      | %10.1f ns      | %10.1f ns      | %6.2fx       | %6.2fx\n",
+               N, med_base, med_strong, med_two, ratio_base, ratio_strong);
+        (void)base_exit_runs; (void)strong_exit_runs; (void)two_exit_runs;
+
+        if (c == 4 && legacy_csv) { /* N = 100 */
             fprintf(legacy_csv, "exp5_latency,scope_teardown,%d,0,0,0,0,0,0,0,0.0,%.2f,%.2f\n",
-                    N, med_two, ratio);
+                    N, med_two, ratio_base);
         }
     }
 
@@ -894,6 +1085,201 @@ static void run_experiment_6(void) {
         free(src);
     }
     if (csv) fclose(csv);
+    printf("=========================================================================================================================\n");
+}
+
+/* =========================================================================
+ * FILTER ABLATION: Range Filter vs Bloom Filter (10,000 Seeded Absent Probes)
+ * ========================================================================= */
+static void run_filter_ablation_experiment(FILE* legacy_csv) {
+    (void)legacy_csv;
+    printf("\n=========================================================================================================================\n");
+    printf(" FILTER ABLATION: Range Check vs Bloom Filter Performance (10,000 Absent Probes, Seed 0x4D595445)\n");
+    printf("=========================================================================================================================\n");
+    printf("%-26s | %-12s | %-14s | %-12s | %-12s | %-12s | %-10s\n",
+           "Workload", "Filter Mode", "Probe Latency", "Range Skips", "Bloom Skips", "Bloom FP Rate", "Decomps");
+    printf("-------------------------------------------------------------------------------------------------------------------------\n");
+
+    FILE* csv = fopen("bench/results/exp_filter_ablation.csv", "w");
+    if (csv) {
+        fprintf(csv, "run_id,config,workload,latency_ns,range_skips,bloom_skips,bloom_false_positives,bloom_checks,bloom_fp_rate,decompressions\n");
+    }
+
+    uint32_t seed = 0x4D595445u;
+    #define ABSENT_PROBES 10000
+    char (*absent_keys)[32] = (char (*)[32])malloc(ABSENT_PROBES * 32);
+    if (!absent_keys) return;
+    for (int i = 0; i < ABSENT_PROBES; i++) {
+        uint32_t val = (seed ^ ((uint32_t)i * 0x9e3779b9u));
+        snprintf(absent_keys[i], 32, "absent_%05d_%08x", i, val);
+    }
+
+    const char* configs[] = { "both", "range_only", "bloom_only", "neither" };
+
+    for (size_t w = 0; w < NUM_WORKLOADS; w++) {
+        char* src = read_entire_file(ALL_WORKLOADS[w]);
+        if (!src) continue;
+        const char* base_w = get_base_name(ALL_WORKLOADS[w]);
+
+        type_table_t* tt = type_table_create();
+        parser_t parser;
+        parser_init(&parser, src, tt);
+        ast_node_t* prog = parser_parse_program(&parser);
+
+        for (int cfg = 0; cfg < 4; cfg++) {
+            const char* cfg_name = configs[cfg];
+            int enable_bloom = (cfg == 0 || cfg == 2) ? 1 : 0;
+            int enable_range = (cfg == 0 || cfg == 1) ? 1 : 0;
+
+            double lat_runs[NUM_RUNS];
+            uint64_t last_range_skips = 0, last_bloom_skips = 0, last_bloom_fp = 0, last_decomps = 0;
+
+            for (int r = 0; r < NUM_RUNS; r++) {
+                mem_tracker_reset();
+                symtab_t* tab = symtab_twotier_create(2, 0);
+                tab->set_param(tab, "bloom", enable_bloom);
+                tab->set_param(tab, "range", enable_range);
+
+                semantic_context_t ctx;
+                semantic_init(&ctx, tab, tt);
+                ctx.quiet = true;
+                semantic_analyze(&ctx, prog);
+
+                symtab_stats_t pre_st;
+                tab->get_stats(tab, &pre_st);
+
+                double t0 = get_time_ns();
+                for (int i = 0; i < ABSENT_PROBES; i++) {
+                    tab->lookup(tab, absent_keys[i]);
+                }
+                double t1 = get_time_ns();
+                lat_runs[r] = (t1 - t0) / (double)ABSENT_PROBES;
+
+                symtab_stats_t post_st;
+                tab->get_stats(tab, &post_st);
+
+                uint64_t d_range_skips = post_st.range_skips - pre_st.range_skips;
+                uint64_t d_bloom_skips = post_st.bloom_skips - pre_st.bloom_skips;
+                uint64_t d_bloom_fp = post_st.bloom_false_positives - pre_st.bloom_false_positives;
+                uint64_t d_decomps = post_st.decompressions - pre_st.decompressions;
+                uint64_t bloom_checks = d_bloom_skips + d_bloom_fp;
+                double fp_rate = (bloom_checks > 0) ? ((double)d_bloom_fp / (double)bloom_checks * 100.0) : 0.0;
+
+                last_range_skips = d_range_skips;
+                last_bloom_skips = d_bloom_skips;
+                last_bloom_fp = d_bloom_fp;
+                last_decomps = d_decomps;
+
+                if (csv) {
+                    fprintf(csv, "%d,%s,%s,%.2f,%llu,%llu,%llu,%llu,%.2f,%llu\n",
+                            r + 1, cfg_name, base_w, lat_runs[r],
+                            (unsigned long long)d_range_skips,
+                            (unsigned long long)d_bloom_skips,
+                            (unsigned long long)d_bloom_fp,
+                            (unsigned long long)bloom_checks,
+                            fp_rate,
+                            (unsigned long long)d_decomps);
+                }
+
+                tab->destroy(tab);
+            }
+
+            double med_lat, iqr_lat;
+            calc_median_iqr(lat_runs, NUM_RUNS, &med_lat, &iqr_lat);
+            uint64_t checks = last_bloom_skips + last_bloom_fp;
+            double fp_pct = (checks > 0) ? ((double)last_bloom_fp / (double)checks * 100.0) : 0.0;
+
+            if (w == 4 || w == 7) { /* Flight controller and Deep nesting */
+                printf("%-26s | %-12s | %10.1f ns/op  | %12llu | %12llu | %11.2f%% | %10llu\n",
+                       base_w, cfg_name, med_lat,
+                       (unsigned long long)last_range_skips,
+                       (unsigned long long)last_bloom_skips,
+                       fp_pct,
+                       (unsigned long long)last_decomps);
+            }
+        }
+
+        ast_destroy_node(prog);
+        type_table_destroy(tt);
+        free(src);
+    }
+
+    free(absent_keys);
+    if (csv) fclose(csv);
+    printf("=========================================================================================================================\n");
+}
+
+/* =========================================================================
+ * OPERATION MIX EXPERIMENT (Inserts, Lookups, Exits, Decomps, Mallocs, Runtime)
+ * ========================================================================= */
+static void run_operation_mix_experiment(void) {
+    printf("\n=========================================================================================================================\n");
+    printf(" EXPERIMENT: Comprehensive Operation Mix & Runtime Profiling across 8 Workloads\n");
+    printf("=========================================================================================================================\n");
+
+    FILE* csv = fopen("bench/results/op_mix.csv", "w");
+    if (!csv) return;
+    fprintf(csv, "workload,engine,inserts,hot_lookups,cold_lookups,misses,scope_exits,decompressions,cache_hits,avg_insert_ns,avg_lookup_ns,avg_scope_exit_ns,malloc_count,free_count,total_runtime_us\n");
+
+    const char* test_engines[] = { "baseline", "strong_baseline", "twotier" };
+
+    for (size_t w = 0; w < NUM_WORKLOADS; w++) {
+        char* src = read_entire_file(ALL_WORKLOADS[w]);
+        if (!src) continue;
+        const char* base_w = get_base_name(ALL_WORKLOADS[w]);
+
+        type_table_t* tt = type_table_create();
+        parser_t parser;
+        parser_init(&parser, src, tt);
+        ast_node_t* prog = parser_parse_program(&parser);
+
+        for (int e = 0; e < 3; e++) {
+            const char* eng = test_engines[e];
+            mem_tracker_reset();
+            symtab_t* tab = create_engine(eng, 2, 0);
+
+            semantic_context_t ctx;
+            semantic_init(&ctx, tab, tt);
+            ctx.quiet = true;
+
+            double t0 = get_time_ns();
+            semantic_analyze(&ctx, prog);
+            double t1 = get_time_ns();
+            double total_us = (t1 - t0) / 1000.0;
+
+            symtab_stats_t st;
+            tab->get_stats(tab, &st);
+            mem_stats_t mst = mem_tracker_get_stats();
+
+            size_t total_ops = st.total_inserts + st.total_lookups + st.total_scopes_destroyed;
+            if (total_ops == 0) total_ops = 1;
+            double avg_insert_ns = (st.total_inserts > 0) ? ((t1 - t0) * (double)st.total_inserts / (double)total_ops / (double)st.total_inserts) : 0.0;
+            double avg_lookup_ns = (st.total_lookups > 0) ? ((t1 - t0) * (double)st.total_lookups / (double)total_ops / (double)st.total_lookups) : 0.0;
+            double avg_exit_ns = (st.total_scopes_destroyed > 0) ? ((t1 - t0) * (double)st.total_scopes_destroyed / (double)total_ops / (double)st.total_scopes_destroyed) : 0.0;
+
+            fprintf(csv, "%s,%s,%zu,%llu,%llu,%llu,%zu,%llu,%llu,%.1f,%.1f,%.1f,%zu,%zu,%.1f\n",
+                    base_w, eng,
+                    st.total_inserts,
+                    (unsigned long long)st.hot_hits,
+                    (unsigned long long)st.cold_hits,
+                    (unsigned long long)st.misses,
+                    st.total_scopes_destroyed,
+                    (unsigned long long)st.decompressions,
+                    (unsigned long long)st.cache_hits,
+                    avg_insert_ns, avg_lookup_ns, avg_exit_ns,
+                    mst.total_allocations, mst.total_frees,
+                    total_us);
+
+            tab->destroy(tab);
+        }
+
+        ast_destroy_node(prog);
+        type_table_destroy(tt);
+        free(src);
+    }
+
+    fclose(csv);
+    printf("Saved per-workload operation mix metrics to 'bench/results/op_mix.csv'\n");
     printf("=========================================================================================================================\n");
 }
 
@@ -1264,32 +1650,36 @@ static void run_experiment_10(FILE* legacy_csv) {
             mem_tracker_set_budget_limit(cap);
             symtab_t* btab = symtab_baseline_create();
             semantic_context_t bctx;
-            semantic_init(&bctx, btab, tt);
-            bctx.quiet = true;
-            semantic_analyze(&bctx, prog);
-            symtab_stats_t bst;
-            btab->get_stats(btab, &bst);
+            symtab_stats_t bst = {0};
+            if (btab) {
+                semantic_init(&bctx, btab, tt);
+                bctx.quiet = true;
+                semantic_analyze(&bctx, prog);
+                btab->get_stats(btab, &bst);
+            }
             size_t b_peak = mem_tracker_get_peak();
             mem_tracker_set_budget_limit(0);
-            btab->destroy(btab);
+            if (btab) btab->destroy(btab);
 
-            bool b_pass = (bst.total_inserts == expected_inserts && b_peak > 0 && b_peak <= cap);
+            bool b_pass = (btab && bst.total_inserts == expected_inserts && b_peak > 0 && b_peak <= cap);
 
             /* 2. Two-Tier under cap */
             mem_tracker_reset();
             mem_tracker_set_budget_limit(cap);
             symtab_t* ttab = symtab_twotier_create(2, cap);
             semantic_context_t tctx;
-            semantic_init(&tctx, ttab, tt);
-            tctx.quiet = true;
-            semantic_analyze(&tctx, prog);
-            symtab_stats_t tst;
-            ttab->get_stats(ttab, &tst);
+            symtab_stats_t tst = {0};
+            if (ttab) {
+                semantic_init(&tctx, ttab, tt);
+                tctx.quiet = true;
+                semantic_analyze(&tctx, prog);
+                ttab->get_stats(ttab, &tst);
+            }
             size_t t_peak = mem_tracker_get_peak();
             mem_tracker_set_budget_limit(0);
-            ttab->destroy(ttab);
+            if (ttab) ttab->destroy(ttab);
 
-            bool t_pass = (tst.total_inserts == expected_inserts && t_peak > 0 && t_peak <= cap);
+            bool t_pass = (ttab && tst.total_inserts == expected_inserts && t_peak > 0 && t_peak <= cap);
 
             const char* b_str = b_pass ? "PASS" : "FAIL (OOM)";
             const char* t_str = t_pass ? "PASS" : "FAIL (OOM)";
@@ -1318,83 +1708,98 @@ static void run_experiment_10(FILE* legacy_csv) {
 }
 
 /* =========================================================================
- * EXPERIMENT 11: End-to-End Compiler Wall Time & Peak Process Memory
+ * EXPERIMENT 11: End-to-End Compiler Wall Time & Process Peak RSS
  * ========================================================================= */
 static void run_experiment_11(void) {
     printf("\n=========================================================================================================================\n");
-    printf(" EXPERIMENT 11: End-to-End Compiler Wall Time & Total Peak Heap RAM (Including AST)\n");
+    printf(" EXPERIMENT 11: End-to-End Compiler Wall Time & Process Peak Resident Set (RSS)\n");
     printf("=========================================================================================================================\n");
-    printf("%-26s | %-15s | %-15s | %-14s | %-14s\n",
-           "Workload", "Baseline Wall", "Two-Tier Wall", "Baseline Heap", "Two-Tier Heap");
+    printf("%-26s | %-12s | %-12s | %-12s | %-12s | %-12s | %-12s\n",
+           "Workload", "Base Wall", "Strong Wall", "TwoTier Wall", "Base Heap", "Strong Heap", "TwoTier Heap");
     printf("-------------------------------------------------------------------------------------------------------------------------\n");
 
     FILE* csv = fopen("bench/results/exp11_compiler_e2e.csv", "w");
     if (csv) {
-        fprintf(csv, "run_id,workload,engine,wall_time_us,peak_heap_bytes\n");
+        fprintf(csv, "run_id,workload,engine,wall_time_us,peak_heap_bytes,process_peak_rss,symtab_peak_bytes,symtab_share_pct\n");
     }
 
-    for (size_t w = 0; w < NUM_WORKLOADS; w++) {
-        char* src = read_entire_file(ALL_WORKLOADS[w]);
+    size_t total_workloads = NUM_WORKLOADS + NUM_EXTENDED_WORKLOADS + 1;
+    const char* test_engines[] = { "baseline", "strong_baseline", "twotier" };
+
+    for (size_t w = 0; w < total_workloads; w++) {
+        char* src = NULL;
+        const char* base_w = NULL;
+
+        if (w < NUM_WORKLOADS) {
+            src = read_entire_file(ALL_WORKLOADS[w]);
+            base_w = get_base_name(ALL_WORKLOADS[w]);
+        } else if (w < NUM_WORKLOADS + NUM_EXTENDED_WORKLOADS) {
+            size_t ext_idx = w - NUM_WORKLOADS;
+            src = read_entire_file(EXTENDED_REAL_WORKLOADS[ext_idx]);
+            base_w = get_base_name(EXTENDED_REAL_WORKLOADS[ext_idx]);
+        } else {
+            src = generate_synthetic_code(256, 16);
+            base_w = "synthetic_depth_256.mc";
+        }
+
         if (!src) continue;
-        const char* base_w = get_base_name(ALL_WORKLOADS[w]);
 
-        double b_times[NUM_RUNS], t_times[NUM_RUNS];
-        double b_peaks[NUM_RUNS], t_peaks[NUM_RUNS];
+        double eng_times[3][NUM_RUNS];
+        double eng_peaks[3][NUM_RUNS];
+        size_t eng_rss[3][NUM_RUNS];
+        size_t eng_sym_peak[3][NUM_RUNS];
 
-        for (int r = 0; r < NUM_RUNS; r++) {
-            /* Baseline E2E */
-            mem_tracker_reset();
-            double bt0 = get_time_ns();
-            type_table_t* b_tt = type_table_create();
-            parser_t b_parser;
-            parser_init(&b_parser, src, b_tt);
-            ast_node_t* b_prog = parser_parse_program(&b_parser);
-            symtab_t* b_tab = symtab_baseline_create();
-            semantic_context_t b_ctx;
-            semantic_init(&b_ctx, b_tab, b_tt);
-            b_ctx.quiet = true;
-            semantic_analyze(&b_ctx, b_prog);
-            b_peaks[r] = (double)mem_tracker_get_peak();
-            b_tab->destroy(b_tab);
-            ast_destroy_node(b_prog);
-            type_table_destroy(b_tt);
-            double bt1 = get_time_ns();
-            b_times[r] = (bt1 - bt0) / 1000.0; /* us */
+        for (int e = 0; e < 3; e++) {
+            const char* eng = test_engines[e];
 
-            /* Two-Tier E2E */
-            mem_tracker_reset();
-            double tt0 = get_time_ns();
-            type_table_t* t_tt = type_table_create();
-            parser_t t_parser;
-            parser_init(&t_parser, src, t_tt);
-            ast_node_t* t_prog = parser_parse_program(&t_parser);
-            symtab_t* t_tab = symtab_twotier_create(2, 0);
-            semantic_context_t t_ctx;
-            semantic_init(&t_ctx, t_tab, t_tt);
-            t_ctx.quiet = true;
-            semantic_analyze(&t_ctx, t_prog);
-            t_peaks[r] = (double)mem_tracker_get_peak();
-            t_tab->destroy(t_tab);
-            ast_destroy_node(t_prog);
-            type_table_destroy(t_tt);
-            double tt1 = get_time_ns();
-            t_times[r] = (tt1 - tt0) / 1000.0; /* us */
+            for (int r = 0; r < NUM_RUNS; r++) {
+                mem_tracker_reset();
+                double t0 = get_time_ns();
+                type_table_t* tt = type_table_create();
+                parser_t parser;
+                parser_init(&parser, src, tt);
+                ast_node_t* prog = parser_parse_program(&parser);
+                symtab_t* tab = create_engine(eng, 2, 0);
+                semantic_context_t ctx;
+                semantic_init(&ctx, tab, tt);
+                ctx.quiet = true;
+                semantic_analyze(&ctx, prog);
 
-            if (csv) {
-                fprintf(csv, "%d,%s,baseline,%.1f,%zu\n", r + 1, base_w, b_times[r], (size_t)b_peaks[r]);
-                fprintf(csv, "%d,%s,twotier,%.1f,%zu\n", r + 1, base_w, t_times[r], (size_t)t_peaks[r]);
+                symtab_stats_t st;
+                tab->get_stats(tab, &st);
+                size_t sym_peak = st.peak_bytes;
+                size_t heap_peak = mem_tracker_get_peak();
+                size_t proc_rss = get_process_peak_rss();
+                if (proc_rss < heap_peak) proc_rss = heap_peak;
+
+                tab->destroy(tab);
+                ast_destroy_node(prog);
+                type_table_destroy(tt);
+                double t1 = get_time_ns();
+
+                eng_times[e][r] = (t1 - t0) / 1000.0; /* us */
+                eng_peaks[e][r] = (double)heap_peak;
+                eng_rss[e][r] = proc_rss;
+                eng_sym_peak[e][r] = sym_peak;
+
+                double share_pct = (proc_rss > 0) ? ((double)sym_peak / (double)proc_rss * 100.0) : 0.0;
+
+                if (csv) {
+                    fprintf(csv, "%d,%s,%s,%.1f,%zu,%zu,%zu,%.2f\n",
+                            r + 1, base_w, eng, eng_times[e][r], heap_peak, proc_rss, sym_peak, share_pct);
+                }
             }
         }
 
-        double med_bt, iqr_bt, med_tt, iqr_tt;
-        double med_bp, iqr_bp, med_tp, iqr_tp;
-        calc_median_iqr(b_times, NUM_RUNS, &med_bt, &iqr_bt);
-        calc_median_iqr(t_times, NUM_RUNS, &med_tt, &iqr_tt);
-        calc_median_iqr(b_peaks, NUM_RUNS, &med_bp, &iqr_bp);
-        calc_median_iqr(t_peaks, NUM_RUNS, &med_tp, &iqr_tp);
+        double med_t[3], iqr_t[3], med_p[3], iqr_p[3];
+        for (int e = 0; e < 3; e++) {
+            calc_median_iqr(eng_times[e], NUM_RUNS, &med_t[e], &iqr_t[e]);
+            calc_median_iqr(eng_peaks[e], NUM_RUNS, &med_p[e], &iqr_p[e]);
+        }
 
-        printf("%-26s | %10.1f us    | %10.1f us    | %10zu B    | %10zu B\n",
-               base_w, med_bt, med_tt, (size_t)med_bp, (size_t)med_tp);
+        printf("%-26s | %9.1f us  | %9.1f us  | %9.1f us   | %9zu B  | %9zu B  | %9zu B\n",
+               base_w, med_t[0], med_t[1], med_t[2], (size_t)med_p[0], (size_t)med_p[1], (size_t)med_p[2]);
+        (void)eng_rss; (void)eng_sym_peak;
 
         free(src);
     }
@@ -1487,6 +1892,7 @@ static void run_ablation_experiment(FILE* legacy_csv) {
 
     symtab_kind_t variants[] = {
         SYMTAB_BASELINE,
+        SYMTAB_STRONG_BASELINE,
         SYMTAB_ARENA_ONLY,
         SYMTAB_INTERN_ONLY,
         SYMTAB_PACKED_ONLY,
@@ -1495,11 +1901,12 @@ static void run_ablation_experiment(FILE* legacy_csv) {
     };
     const char* names[] = {
         "1. Baseline (Malloc-Chained)",
-        "2. + Arena Allocator",
-        "3. + String Interning",
-        "4. + 64-bit Packed Symbols",
-        "5. + Delta/Varint Compression",
-        "6. + Bloom Filter (Full Two-Tier)"
+        "2. Strong Baseline (Open-Addr, No Comp)",
+        "3. + Arena Allocator",
+        "4. + String Interning",
+        "5. + 64-bit Packed Symbols",
+        "6. + Delta/Varint Compression",
+        "7. + Bloom Filter (Full Two-Tier)"
     };
     size_t num_variants = sizeof(variants) / sizeof(variants[0]);
     size_t base_ram = 0;
@@ -1509,6 +1916,8 @@ static void run_ablation_experiment(FILE* legacy_csv) {
         symtab_t* tab = NULL;
         if (variants[i] == SYMTAB_BASELINE) {
             tab = symtab_baseline_create();
+        } else if (variants[i] == SYMTAB_STRONG_BASELINE) {
+            tab = symtab_strong_baseline_create();
         } else if (variants[i] == SYMTAB_TWOTIER) {
             tab = symtab_twotier_create(2, 0);
         } else {
@@ -1874,6 +2283,8 @@ int main(int argc, char** argv) {
     run_experiment_4(legacy_csv);
     run_experiment_5(legacy_csv);
     run_experiment_6();
+    run_filter_ablation_experiment(legacy_csv);
+    run_operation_mix_experiment();
     run_experiment_7();
     run_experiment_8();
     run_experiment_9(legacy_csv);

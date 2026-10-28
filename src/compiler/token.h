@@ -49,6 +49,8 @@ typedef enum {
     TOK_GT,         /* > */
     TOK_LE,         /* <= */
     TOK_GE,         /* >= */
+    TOK_AMPERSAND,  /* & */
+    TOK_PERCENT,    /* % */
 
     TOK_ERROR
 } token_kind_t;

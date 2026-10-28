@@ -167,9 +167,9 @@ static ast_node_t* parse_postfix(parser_t* parser) {
             idx_node->as.index_expr.target = expr;
             idx_node->as.index_expr.index = index;
             expr = idx_node;
-        } else if (match(parser, TOK_DOT)) {
+        } else if (match(parser, TOK_DOT) || match(parser, TOK_ARROW)) {
             char mname[64] = {0};
-            if (consume_identifier(parser, mname, sizeof(mname), "Expected member name after '.'")) {
+            if (consume_identifier(parser, mname, sizeof(mname), "Expected member name after '.' or '->'")) {
                 ast_node_t* member = ast_create_node(AST_MEMBER_EXPR, expr->line, expr->col);
                 member->as.member.target = expr;
                 safe_copy_str(member->as.member.field_name, mname, sizeof(member->as.member.field_name));
@@ -184,7 +184,7 @@ static ast_node_t* parse_postfix(parser_t* parser) {
 }
 
 static ast_node_t* parse_unary(parser_t* parser) {
-    if (check(parser, TOK_MINUS) || check(parser, TOK_PLUS)) {
+    if (check(parser, TOK_MINUS) || check(parser, TOK_PLUS) || check(parser, TOK_STAR) || check(parser, TOK_AMPERSAND)) {
         token_kind_t op = parser->current.kind;
         size_t line = parser->current.line;
         size_t col = parser->current.col;
@@ -208,7 +208,7 @@ static ast_node_t* parse_unary(parser_t* parser) {
 
 static ast_node_t* parse_multiplicative(parser_t* parser) {
     ast_node_t* expr = parse_unary(parser);
-    while (check(parser, TOK_STAR) || check(parser, TOK_SLASH)) {
+    while (check(parser, TOK_STAR) || check(parser, TOK_SLASH) || check(parser, TOK_PERCENT)) {
         token_kind_t op = parser->current.kind;
         advance(parser);
         ast_node_t* right = parse_unary(parser);
@@ -240,7 +240,8 @@ static ast_node_t* parse_relational(parser_t* parser) {
     ast_node_t* expr = parse_additive(parser);
     while (check(parser, TOK_LT) || check(parser, TOK_GT) ||
            check(parser, TOK_LE) || check(parser, TOK_GE) ||
-           check(parser, TOK_EQ) || check(parser, TOK_NEQ)) {
+           check(parser, TOK_EQ) || check(parser, TOK_NEQ) ||
+           check(parser, TOK_AMPERSAND)) {
         token_kind_t op = parser->current.kind;
         advance(parser);
         ast_node_t* right = parse_additive(parser);
@@ -311,6 +312,9 @@ static ast_node_t* parse_statement(parser_t* parser) {
     /* Variable Declaration */
     type_id_t tid = parse_type_specifier(parser);
     if (tid != TYPE_ID_INVALID) {
+        while (match(parser, TOK_STAR)) {
+            tid = type_get_pointer(parser->type_table, tid);
+        }
         char vname[64] = {0};
         if (!consume_identifier(parser, vname, sizeof(vname), "Expected variable name")) return NULL;
 
@@ -318,13 +322,17 @@ static ast_node_t* parse_statement(parser_t* parser) {
         safe_copy_str(decl->as.var_decl.name, vname, sizeof(decl->as.var_decl.name));
         decl->as.var_decl.type_id = tid;
 
-        /* Array declaration: int arr[10]; */
-        if (match(parser, TOK_LBRACKET)) {
+        /* Array declaration: int arr[10]; or multidimensional: int arr[10][20]; */
+        while (match(parser, TOK_LBRACKET)) {
+            size_t arr_len = 0;
             if (match(parser, TOK_INT_LITERAL)) {
-                decl->as.var_decl.is_array = true;
-                decl->as.var_decl.array_len = (size_t)parser->current.as.int_val;
+                arr_len = (size_t)parser->current.as.int_val;
             }
             consume(parser, TOK_RBRACKET, "Expected ']' after array size");
+            decl->as.var_decl.is_array = true;
+            decl->as.var_decl.array_len = arr_len;
+            tid = type_get_array(parser->type_table, tid, arr_len);
+            decl->as.var_decl.type_id = tid;
         }
 
         /* Optional initializer: int x = 42; */
@@ -377,6 +385,50 @@ static ast_node_t* parse_statement(parser_t* parser) {
         return while_node;
     }
 
+    /* For statement */
+    if (match(parser, TOK_KW_FOR)) {
+        consume(parser, TOK_LPAREN, "Expected '(' after 'for'");
+        ast_node_t* init = NULL;
+        if (!check(parser, TOK_SEMICOLON)) {
+            type_id_t itid = parse_type_specifier(parser);
+            if (itid != TYPE_ID_INVALID) {
+                while (match(parser, TOK_STAR)) {
+                    itid = type_get_pointer(parser->type_table, itid);
+                }
+                char iname[64] = {0};
+                if (consume_identifier(parser, iname, sizeof(iname), "Expected identifier in for init")) {
+                    init = ast_create_node(AST_VAR_DECL, line, col);
+                    safe_copy_str(init->as.var_decl.name, iname, sizeof(init->as.var_decl.name));
+                    init->as.var_decl.type_id = itid;
+                    if (match(parser, TOK_ASSIGN)) {
+                        init->as.var_decl.init_expr = parse_expression(parser);
+                    }
+                }
+            } else {
+                init = parse_expression(parser);
+            }
+        }
+        consume(parser, TOK_SEMICOLON, "Expected ';' after for init");
+        ast_node_t* cond = NULL;
+        if (!check(parser, TOK_SEMICOLON)) {
+            cond = parse_expression(parser);
+        }
+        consume(parser, TOK_SEMICOLON, "Expected ';' after for condition");
+        ast_node_t* step = NULL;
+        if (!check(parser, TOK_RPAREN)) {
+            step = parse_expression(parser);
+        }
+        consume(parser, TOK_RPAREN, "Expected ')' after for step");
+        ast_node_t* body = parse_statement(parser);
+
+        ast_node_t* for_node = ast_create_node(AST_FOR, line, col);
+        for_node->as.for_stmt.init = init;
+        for_node->as.for_stmt.cond = cond;
+        for_node->as.for_stmt.step = step;
+        for_node->as.for_stmt.body = body;
+        return for_node;
+    }
+
     /* Expression statement */
     ast_node_t* expr = parse_expression(parser);
     consume(parser, TOK_SEMICOLON, "Expected ';' after expression");
@@ -406,11 +458,25 @@ static ast_node_t* parse_top_level(parser_t* parser) {
 
             while (!check(parser, TOK_RBRACE) && !check(parser, TOK_EOF)) {
                 type_id_t ftid = parse_type_specifier(parser);
+                while (match(parser, TOK_STAR)) {
+                    ftid = type_get_pointer(parser->type_table, ftid);
+                }
                 char fname[64] = {0};
                 if (consume_identifier(parser, fname, sizeof(fname), "Expected field name")) {
                     ast_node_t* f = ast_create_node(AST_VAR_DECL, line, col);
                     safe_copy_str(f->as.var_decl.name, fname, sizeof(f->as.var_decl.name));
                     f->as.var_decl.type_id = ftid;
+                    while (match(parser, TOK_LBRACKET)) {
+                        size_t arr_len = 0;
+                        if (match(parser, TOK_INT_LITERAL)) {
+                            arr_len = (size_t)parser->current.as.int_val;
+                        }
+                        consume(parser, TOK_RBRACKET, "Expected ']' after array size");
+                        f->as.var_decl.is_array = true;
+                        f->as.var_decl.array_len = arr_len;
+                        ftid = type_get_array(parser->type_table, ftid, arr_len);
+                        f->as.var_decl.type_id = ftid;
+                    }
                     consume(parser, TOK_SEMICOLON, "Expected ';' after struct field");
                     sdecl->as.struct_decl.fields[sdecl->as.struct_decl.field_count++] = f;
                 }
@@ -433,6 +499,10 @@ static ast_node_t* parse_top_level(parser_t* parser) {
         return NULL;
     }
 
+    while (match(parser, TOK_STAR)) {
+        tid = type_get_pointer(parser->type_table, tid);
+    }
+
     char name[64] = {0};
     if (!consume_identifier(parser, name, sizeof(name), "Expected identifier after type")) {
         return NULL;
@@ -449,10 +519,21 @@ static ast_node_t* parse_top_level(parser_t* parser) {
         if (!check(parser, TOK_RPAREN)) {
             do {
                 type_id_t ptid = parse_type_specifier(parser);
+                while (match(parser, TOK_STAR)) {
+                    ptid = type_get_pointer(parser->type_table, ptid);
+                }
                 char pname[64] = {0};
                 if (consume_identifier(parser, pname, sizeof(pname), "Expected parameter name")) {
                     ast_node_t* param = ast_create_node(AST_PARAM_DECL, line, col);
                     safe_copy_str(param->as.param_decl.name, pname, sizeof(param->as.param_decl.name));
+                    while (match(parser, TOK_LBRACKET)) {
+                        size_t arr_len = 0;
+                        if (match(parser, TOK_INT_LITERAL)) {
+                            arr_len = (size_t)parser->current.as.int_val;
+                        }
+                        consume(parser, TOK_RBRACKET, "Expected ']' after array size");
+                        ptid = type_get_array(parser->type_table, ptid, arr_len);
+                    }
                     param->as.param_decl.type_id = ptid;
                     fdecl->as.func_decl.params[fdecl->as.func_decl.param_count++] = param;
                 }
@@ -470,12 +551,16 @@ static ast_node_t* parse_top_level(parser_t* parser) {
     safe_copy_str(gvar->as.var_decl.name, name, sizeof(gvar->as.var_decl.name));
     gvar->as.var_decl.type_id = tid;
 
-    if (match(parser, TOK_LBRACKET)) {
+    while (match(parser, TOK_LBRACKET)) {
+        size_t arr_len = 0;
         if (match(parser, TOK_INT_LITERAL)) {
-            gvar->as.var_decl.is_array = true;
-            gvar->as.var_decl.array_len = (size_t)parser->current.as.int_val;
+            arr_len = (size_t)parser->current.as.int_val;
         }
         consume(parser, TOK_RBRACKET, "Expected ']' after array size");
+        gvar->as.var_decl.is_array = true;
+        gvar->as.var_decl.array_len = arr_len;
+        tid = type_get_array(parser->type_table, tid, arr_len);
+        gvar->as.var_decl.type_id = tid;
     }
 
     if (match(parser, TOK_ASSIGN)) {

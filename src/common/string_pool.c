@@ -4,9 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define INITIAL_STRING_CHUNK_SIZE 512
+#define INITIAL_STRING_CHUNK_SIZE 256
 #define MAX_STRING_CHUNK_SIZE 16384
-#define INITIAL_SLOTS 64
+#define INITIAL_SLOTS 32
 
 typedef struct string_chunk {
     size_t capacity;
@@ -45,7 +45,7 @@ static uint32_t fnv1a_hash(const char* s) {
 }
 
 string_pool_t* string_pool_create(size_t initial_capacity) {
-    if (initial_capacity < 32) initial_capacity = 32;
+    if (initial_capacity < 16) initial_capacity = 16;
     
     string_pool_t* pool = (string_pool_t*)tracked_malloc(sizeof(string_pool_t));
     if (!pool) return NULL;
@@ -144,7 +144,8 @@ name_id_t string_pool_intern(string_pool_t* pool, const char* str) {
 
     if (pool->chunk_tail->used + len > pool->chunk_tail->capacity) {
         size_t next_cap = pool->chunk_tail->capacity * 2;
-        if (next_cap < len) next_cap = len + 256;
+        if (next_cap > 2048) next_cap = 2048;
+        if (next_cap < len) next_cap = len + 128;
         if (next_cap > MAX_STRING_CHUNK_SIZE) next_cap = MAX_STRING_CHUNK_SIZE;
         string_chunk_t* new_chunk = (string_chunk_t*)tracked_malloc(sizeof(string_chunk_t) + next_cap);
         if (!new_chunk) return NAME_ID_INVALID;

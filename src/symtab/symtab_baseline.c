@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #define BASELINE_INITIAL_BUCKETS 64
-#define BASELINE_MAX_SCOPES 256
+#define BASELINE_MAX_SCOPES 512
 
 typedef struct baseline_symbol {
     char* name;
